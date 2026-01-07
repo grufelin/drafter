@@ -1,0 +1,23 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment (may contain secrets)
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Test draft
+draft.txt
+plan.json

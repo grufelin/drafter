@@ -1,0 +1,30 @@
+[package]
+name = "drafter"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = []
+# Remote LLM integration (off by default)
+llm = ["dep:dotenvy", "dep:futures-util", "dep:async-openai", "dep:tokio"]
+
+[dependencies]
+anyhow = "1.0.86"
+clap = { version = "4.5.23", features = ["derive"] }
+ctrlc = "3.4.5"
+dotenvy = { version = "0.15.7", optional = true }
+futures-util = { version = "0.3.31", optional = true }
+memfd = "0.6.4"
+async-openai = { version = "0.32.2", features = ["chat-completion"], optional = true }
+rand = "0.8.5"
+rand_distr = "0.4.3"
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.117"
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread", "time"], optional = true }
+wayland-backend = "0.3.12"
+wayland-client = "0.31.7"
+wayland-scanner = "0.31.8"
+xkbcommon = "0.9.0"
+
+[dev-dependencies]
+pretty_assertions = "1.4.1"
