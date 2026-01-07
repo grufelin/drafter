@@ -112,7 +112,9 @@ This section describes the human-like typing/editing behaviors `drafter` can emu
     3. Backspace the wrong span, type the correct span, then navigate right back using a mix of `Right` and `Ctrl+Right`.
 
 - **Word navigation (Ctrl+Left/Right)**
-  - Algorithm: during corrections, the planner may use `Ctrl+Left/Right` to move by semantic runs (words/punctuation), then fine-tune with plain arrows.
+  - Algorithm: during corrections, the planner may use word-jump shortcuts depending on a selectable word navigation profile:
+    - `chrome` (default): current behavior tuned to match Chrome/Docs word-boundary semantics.
+    - `compatible`: conservative mode; only emits `Ctrl+Left/Right` when the predicted jump stays within simple ASCII words+spaces (and is not adjacent to punctuation), otherwise falls back to plain `Left/Right`.
 
 - **Near-end review pass (always)**
   - Algorithm: after finishing the forward typing pass, insert a review pause and then fix all remaining outstanding errors.

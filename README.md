@@ -32,7 +32,7 @@ System libraries for building:
 cargo build --release
 ```
 
-To enable experimental LLM support (for alternative phrasing):
+To enable LLM support (for alternative phrasing):
 
 ```bash
 cargo build --release --features llm
@@ -78,6 +78,7 @@ Play it into the focused editor:
 - `--wpm-min` / `--wpm-max`: speed range
 - `--error-rate`: probability of injecting an error per word
 - `--immediate-fix-rate`: how often an error is fixed immediately
+- `--profile <chrome|compatible>`: word navigation behavior used during corrections (default `chrome`)
 - `--seed`: make planning deterministic (useful for debugging)
 - `--no-trace`: disable console typing/correction trace during playback (on by default)
 

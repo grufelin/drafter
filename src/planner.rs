@@ -9,6 +9,7 @@ use crate::keyboard::{
 use crate::keymap::us_qwerty_keymap;
 use crate::llm::{validate_phrase_alternatives, PhraseAlternative};
 use crate::model::{Action, KeyState, Plan, PlanConfig};
+use crate::word_nav_profile::{compatible_ctrl_jump_is_safe, WordNavProfile};
 
 #[derive(Debug, Clone)]
 pub struct PlannerConfig {
@@ -17,6 +18,7 @@ pub struct PlannerConfig {
     pub error_rate_per_word: f64,
     pub word_variant_share: f64,
     pub immediate_fix_rate: f64,
+    pub word_nav_profile: WordNavProfile,
     pub max_outstanding_errors: usize,
     pub stop_corrections_after_progress: f64,
     pub review_pause_ms_min: u64,
@@ -31,6 +33,7 @@ impl Default for PlannerConfig {
             error_rate_per_word: 0.05,
             word_variant_share: 0.35,
             immediate_fix_rate: 0.35,
+            word_nav_profile: WordNavProfile::Chrome,
             max_outstanding_errors: 4,
             stop_corrections_after_progress: 0.88,
             review_pause_ms_min: 1200,
@@ -583,30 +586,62 @@ fn navigate_left_to(
     builder: &mut ActionBuilder,
     editor: &mut EditorState,
     target: usize,
+    profile: WordNavProfile,
     rng: &mut impl Rng,
 ) {
     let target = target.min(editor.buf.len());
 
-    while editor.cursor > target {
-        let ctrl_target = crate::word_nav::ctrl_left(&editor.buf, editor.cursor, is_word_char);
-        let ctrl_delta = editor.cursor.saturating_sub(ctrl_target);
-        let remaining = editor.cursor - target;
-        let crosses_newline = editor.buf[ctrl_target..editor.cursor]
-            .iter()
-            .any(|c| *c == '\n');
+    match profile {
+        WordNavProfile::Chrome => {
+            while editor.cursor > target {
+                let ctrl_target =
+                    crate::word_nav::ctrl_left(&editor.buf, editor.cursor, is_word_char);
+                let ctrl_delta = editor.cursor.saturating_sub(ctrl_target);
+                let remaining = editor.cursor - target;
+                let crosses_newline = editor.buf[ctrl_target..editor.cursor]
+                    .iter()
+                    .any(|c| *c == '\n');
 
-        if ctrl_target >= target && ctrl_delta >= 4 && remaining >= 12 && !crosses_newline {
-            builder.nav_word_left(rng);
-            editor.move_word_left();
-        } else {
-            builder.nav_left(rng);
-            editor.move_left();
+                if ctrl_target >= target && ctrl_delta >= 4 && remaining >= 12 && !crosses_newline {
+                    builder.nav_word_left(rng);
+                    editor.move_word_left();
+                } else {
+                    builder.nav_left(rng);
+                    editor.move_left();
+                }
+
+                if rng.gen_bool(0.03) {
+                    builder.wait(rng.gen_range(40..=180));
+                } else {
+                    builder.wait(rng.gen_range(6..=22));
+                }
+            }
         }
+        WordNavProfile::Compatible => {
+            while editor.cursor > target {
+                let ctrl_target =
+                    crate::word_nav::ctrl_left(&editor.buf, editor.cursor, is_word_char);
+                let ctrl_delta = editor.cursor.saturating_sub(ctrl_target);
+                let remaining = editor.cursor - target;
+                let safe_jump =
+                    compatible_ctrl_jump_is_safe(&editor.buf, editor.cursor, ctrl_target);
 
-        if rng.gen_bool(0.03) {
-            builder.wait(rng.gen_range(40..=180));
-        } else {
-            builder.wait(rng.gen_range(6..=22));
+                if ctrl_target >= target && ctrl_delta >= 4 && remaining >= 12 && safe_jump {
+                    builder.nav_word_left(rng);
+                    editor.move_word_left();
+                } else {
+                    builder.nav_left(rng);
+                    editor.move_left();
+                }
+
+                if rng.gen_bool(0.03) {
+                    builder.wait(rng.gen_range(40..=180));
+                } else {
+                    builder.wait(rng.gen_range(6..=22));
+                }
+            }
+
+            builder.set_ctrl(false, rng);
         }
     }
 }
@@ -615,30 +650,59 @@ fn navigate_right_to(
     builder: &mut ActionBuilder,
     editor: &mut EditorState,
     target: usize,
+    profile: WordNavProfile,
     rng: &mut impl Rng,
 ) {
     let target = target.min(editor.buf.len());
 
-    while editor.cursor < target {
-        let ctrl_target = crate::word_nav::ctrl_right(&editor.buf, editor.cursor, is_word_char);
-        let ctrl_delta = ctrl_target.saturating_sub(editor.cursor);
-        let remaining = target - editor.cursor;
-        let crosses_newline = editor.buf[editor.cursor..ctrl_target]
-            .iter()
-            .any(|c| *c == '\n');
+    match profile {
+        WordNavProfile::Chrome => {
+            while editor.cursor < target {
+                let ctrl_target =
+                    crate::word_nav::ctrl_right(&editor.buf, editor.cursor, is_word_char);
+                let ctrl_delta = ctrl_target.saturating_sub(editor.cursor);
+                let remaining = target - editor.cursor;
+                let crosses_newline = editor.buf[editor.cursor..ctrl_target]
+                    .iter()
+                    .any(|c| *c == '\n');
 
-        if ctrl_target <= target && ctrl_delta >= 4 && remaining >= 12 && !crosses_newline {
-            builder.nav_word_right(rng);
-            editor.move_word_right();
-        } else {
-            builder.nav_right(rng);
-            editor.move_right();
+                if ctrl_target <= target && ctrl_delta >= 4 && remaining >= 12 && !crosses_newline {
+                    builder.nav_word_right(rng);
+                    editor.move_word_right();
+                } else {
+                    builder.nav_right(rng);
+                    editor.move_right();
+                }
+
+                builder.wait(rng.gen_range(6..=22));
+            }
+
+            builder.set_ctrl(false, rng);
         }
+        WordNavProfile::Compatible => {
+            while editor.cursor < target {
+                let ctrl_target =
+                    crate::word_nav::ctrl_right(&editor.buf, editor.cursor, is_word_char);
+                let ctrl_delta = ctrl_target.saturating_sub(editor.cursor);
+                let remaining = target - editor.cursor;
 
-        builder.wait(rng.gen_range(6..=22));
+                let safe_jump =
+                    compatible_ctrl_jump_is_safe(&editor.buf, editor.cursor, ctrl_target);
+
+                if ctrl_target <= target && ctrl_delta >= 4 && remaining >= 12 && safe_jump {
+                    builder.nav_word_right(rng);
+                    editor.move_word_right();
+                } else {
+                    builder.nav_right(rng);
+                    editor.move_right();
+                }
+
+                builder.wait(rng.gen_range(6..=22));
+            }
+
+            builder.set_ctrl(false, rng);
+        }
     }
-
-    builder.set_ctrl(false, rng);
 }
 
 fn fix_error_at_position(
@@ -646,6 +710,7 @@ fn fix_error_at_position(
     editor: &mut EditorState,
     err: OutstandingError,
     wpm: f64,
+    profile: WordNavProfile,
     rng: &mut impl Rng,
 ) -> Result<()> {
     let wrong_len = err.wrong.chars().count();
@@ -654,7 +719,7 @@ fn fix_error_at_position(
         return Err(anyhow!("internal error: correction target after cursor"));
     }
 
-    navigate_left_to(builder, editor, target_end, rng);
+    navigate_left_to(builder, editor, target_end, profile, rng);
 
     builder.wait(rng.gen_range(50..=220));
 
@@ -667,7 +732,7 @@ fn fix_error_at_position(
     type_string(builder, editor, &err.correct, wpm, rng)?;
 
     // Return to end.
-    navigate_right_to(builder, editor, editor.buf.len(), rng);
+    navigate_right_to(builder, editor, editor.buf.len(), profile, rng);
 
     Ok(())
 }
@@ -914,7 +979,14 @@ fn generate_plan_impl(
 
             if should_fix {
                 let err = outstanding.pop().unwrap();
-                fix_error_at_position(&mut builder, &mut editor, err, wpm_target, rng)?;
+                fix_error_at_position(
+                    &mut builder,
+                    &mut editor,
+                    err,
+                    wpm_target,
+                    cfg.word_nav_profile,
+                    rng,
+                )?;
                 builder.wait(rng.gen_range(80..=420));
             }
         }
@@ -924,7 +996,14 @@ fn generate_plan_impl(
     builder.wait(rng.gen_range(cfg.review_pause_ms_min..=cfg.review_pause_ms_max));
 
     while let Some(err) = outstanding.pop() {
-        fix_error_at_position(&mut builder, &mut editor, err, wpm_target, rng)?;
+        fix_error_at_position(
+            &mut builder,
+            &mut editor,
+            err,
+            wpm_target,
+            cfg.word_nav_profile,
+            rng,
+        )?;
         builder.wait(rng.gen_range(120..=520));
     }
 

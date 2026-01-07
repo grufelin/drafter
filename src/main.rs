@@ -12,6 +12,7 @@ use drafter::llm::PhraseAlternative;
 use drafter::planner::{generate_plan, generate_plan_with_phrase_alternatives, PlannerConfig};
 use drafter::playback::play_plan;
 use drafter::sim;
+use drafter::word_nav_profile::WordNavProfile;
 
 const DEFAULT_LLM_MODEL: &str = drafter::llm::openrouter::DEFAULT_MODEL;
 
@@ -39,6 +40,23 @@ enum LlmFailurePolicy {
     Fallback,
     /// On any LLM/cache error, return an error.
     Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum WordNavProfileArg {
+    /// Current behavior; best for Chrome/Docs-like editors.
+    Chrome,
+    /// Conservative mode: fewer Ctrl+word shortcuts; more robust across toolkits.
+    Compatible,
+}
+
+impl WordNavProfileArg {
+    fn to_library(self) -> WordNavProfile {
+        match self {
+            WordNavProfileArg::Chrome => WordNavProfile::Chrome,
+            WordNavProfileArg::Compatible => WordNavProfile::Compatible,
+        }
+    }
 }
 
 #[derive(Debug, Args, Clone)]
@@ -121,6 +139,13 @@ enum Command {
         #[arg(long, default_value_t = 0.35)]
         immediate_fix_rate: f64,
 
+        /// Word navigation profile for Ctrl+Left/Right during corrections.
+        ///
+        /// - chrome: current behavior; best for Chrome/Docs-like editors.
+        /// - compatible: fewer Ctrl+word shortcuts; more robust across toolkits.
+        #[arg(long, value_enum, default_value_t = WordNavProfileArg::Chrome)]
+        profile: WordNavProfileArg,
+
         #[command(flatten)]
         llm: LlmArgs,
     },
@@ -176,6 +201,13 @@ enum Command {
         #[arg(long, default_value_t = 0.35)]
         immediate_fix_rate: f64,
 
+        /// Word navigation profile for Ctrl+Left/Right during corrections.
+        ///
+        /// - chrome: current behavior; best for Chrome/Docs-like editors.
+        /// - compatible: fewer Ctrl+word shortcuts; more robust across toolkits.
+        #[arg(long, value_enum, default_value_t = WordNavProfileArg::Chrome)]
+        profile: WordNavProfileArg,
+
         #[command(flatten)]
         llm: LlmArgs,
     },
@@ -212,12 +244,14 @@ fn build_config(
     wpm_max: f64,
     error_rate: f64,
     immediate_fix_rate: f64,
+    profile: WordNavProfileArg,
 ) -> PlannerConfig {
     PlannerConfig {
         wpm_min,
         wpm_max,
         error_rate_per_word: error_rate,
         immediate_fix_rate,
+        word_nav_profile: profile.to_library(),
         ..Default::default()
     }
 }
@@ -405,10 +439,11 @@ fn main() -> Result<()> {
             wpm_max,
             error_rate,
             immediate_fix_rate,
+            profile,
             llm,
         } => {
             let final_text = read_input(&input)?;
-            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate);
+            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile);
             let mut rng = rng_from_seed(seed);
 
             let plan = maybe_generate_plan(&final_text, cfg, &llm, &mut rng)?;
@@ -459,10 +494,11 @@ fn main() -> Result<()> {
             wpm_max,
             error_rate,
             immediate_fix_rate,
+            profile,
             llm,
         } => {
             let final_text = read_input(&input)?;
-            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate);
+            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile);
             let mut rng = rng_from_seed(seed);
 
             let plan = maybe_generate_plan(&final_text, cfg, &llm, &mut rng)?;
