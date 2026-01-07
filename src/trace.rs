@@ -45,6 +45,14 @@ impl EditorState {
         }
     }
 
+    fn move_word_left(&mut self) {
+        self.cursor = crate::word_nav::ctrl_left(&self.buf, self.cursor, is_word_char);
+    }
+
+    fn move_word_right(&mut self) {
+        self.cursor = crate::word_nav::ctrl_right(&self.buf, self.cursor, is_word_char);
+    }
+
     fn home(&mut self) {
         self.cursor = 0;
     }
@@ -200,8 +208,20 @@ impl PlaybackTracer {
             self.flush_typing_run_on_edit();
 
             match keycode {
-                KEY_LEFT => self.editor.move_left(),
-                KEY_RIGHT => self.editor.move_right(),
+                KEY_LEFT => {
+                    if self.ctrl_down {
+                        self.editor.move_word_left();
+                    } else {
+                        self.editor.move_left();
+                    }
+                }
+                KEY_RIGHT => {
+                    if self.ctrl_down {
+                        self.editor.move_word_right();
+                    } else {
+                        self.editor.move_right();
+                    }
+                }
                 KEY_HOME => self.editor.home(),
                 KEY_END => self.editor.end(),
                 KEY_UP | KEY_DOWN => {}
@@ -429,8 +449,20 @@ impl TracePlanner {
             }
 
             match keycode {
-                KEY_LEFT => self.editor.move_left(),
-                KEY_RIGHT => self.editor.move_right(),
+                KEY_LEFT => {
+                    if self.ctrl_down {
+                        self.editor.move_word_left();
+                    } else {
+                        self.editor.move_left();
+                    }
+                }
+                KEY_RIGHT => {
+                    if self.ctrl_down {
+                        self.editor.move_word_right();
+                    } else {
+                        self.editor.move_right();
+                    }
+                }
                 KEY_HOME => self.editor.home(),
                 KEY_END => self.editor.end(),
                 KEY_UP | KEY_DOWN => {}

@@ -7,3 +7,4 @@ pub mod playback;
 pub mod protocols;
 pub mod sim;
 pub mod trace;
+pub mod word_nav;

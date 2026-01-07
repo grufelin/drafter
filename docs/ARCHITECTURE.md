@@ -108,14 +108,17 @@ This section describes the human-like typing/editing behaviors `drafter` can emu
 - **Delayed corrections (type wrong now → fix later)**
   - Algorithm:
     1. While typing, store `OutstandingError { start, wrong, correct, fix_after_chars, constraint }`.
-    2. Later (based on age/pressure/randomness), navigate left with repeated `Left` key presses back to the end of the wrong span.
-    3. Backspace the wrong span, type the correct span, then navigate right back to where typing left off.
+    2. Later (based on age/pressure/randomness), navigate left back to the end of the wrong span using a mix of `Left` and `Ctrl+Left`, then fine-tune with `Left`.
+    3. Backspace the wrong span, type the correct span, then navigate right back using a mix of `Right` and `Ctrl+Right`.
+
+- **Word navigation (Ctrl+Left/Right)**
+  - Algorithm: during corrections, the planner may use `Ctrl+Left/Right` to move by semantic runs (words/punctuation), then fine-tune with plain arrows.
 
 - **Near-end review pass (always)**
   - Algorithm: after finishing the forward typing pass, insert a review pause and then fix all remaining outstanding errors.
 
 - **Keyboard-only interaction with safe keys**
-  - Algorithm: plans are composed only of low-level key events and modifier updates; the current planner uses printable characters, `Enter`, arrows, and `Backspace`.
+  - Algorithm: plans are composed only of low-level key events and modifier updates; the current planner uses printable characters, `Enter`, arrows, `Backspace`, and `Ctrl+Left/Right`.
 
 - **Smart quotes in the final draft (`’‘”“`)**
   - Algorithm: the planner tracks the Unicode characters in the final draft, but emits ASCII keystrokes (`'` and `"`) and relies on editor auto-substitution (e.g. Google Docs smart quotes) so the final editor text can match the draft.
@@ -123,7 +126,7 @@ This section describes the human-like typing/editing behaviors `drafter` can emu
 ### Not yet supported
 
 - **General Unicode typing** (beyond `’‘”“`) and **non-US keyboard layouts**.
-- **Selection-based editing** (Shift+arrows, Shift+Home/End) and **word navigation/deletion shortcuts** (Ctrl+Left/Right, Ctrl+Backspace/Delete).
+- **Selection-based editing** (Shift+arrows, Shift+Home/End) and **word deletion shortcuts** (Ctrl+Backspace/Delete).
 - **Undo/redo-driven correction strategies**.
 - **Starting-state management** (e.g. clearing an existing document) and **any reading/verification of editor contents**.
 - **Editor-aware behavior** (reacting to spellcheck/autocorrect, or different keybindings per editor).

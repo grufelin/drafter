@@ -74,9 +74,21 @@ impl SimEditorState {
         }
     }
 
+    fn move_word_left(&mut self) {
+        self.cursor = crate::word_nav::ctrl_left(&self.buf, self.cursor, is_word_char);
+    }
+
+    fn move_word_right(&mut self) {
+        self.cursor = crate::word_nav::ctrl_right(&self.buf, self.cursor, is_word_char);
+    }
+
     fn as_string(&self) -> String {
         self.buf.iter().collect()
     }
+}
+
+fn is_word_char(c: char) -> bool {
+    c.is_ascii_alphanumeric() || c == '\''
 }
 
 fn us_qwerty_keystroke_map() -> HashMap<(u32, bool), char> {
@@ -136,8 +148,20 @@ pub fn simulate_typed_text(plan: &Plan) -> Result<String> {
         }
 
         match *keycode {
-            KEY_LEFT => editor.move_left(),
-            KEY_RIGHT => editor.move_right(),
+            KEY_LEFT => {
+                if ctrl_down {
+                    editor.move_word_left();
+                } else {
+                    editor.move_left();
+                }
+            }
+            KEY_RIGHT => {
+                if ctrl_down {
+                    editor.move_word_right();
+                } else {
+                    editor.move_right();
+                }
+            }
             KEY_BACKSPACE => editor.backspace(),
             KEY_DELETE => editor.delete(),
             _ => {
