@@ -208,9 +208,9 @@ This avoids depending on external protocol packages at runtime.
 Playback:
 
 - Connects to Wayland and binds:
-  - `wl_seat`
+  - `wl_seat` (selects the requested seat name when provided)
   - `zwp_virtual_keyboard_manager_v1`
-- Creates a `zwp_virtual_keyboard_v1` tied to the seat.
+- Creates a `zwp_virtual_keyboard_v1` tied to the selected seat.
 - Sends the XKB keymap via `keymap()`.
 - Replays each action:
   - `Wait` → sleeps

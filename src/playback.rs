@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Write;
 use std::os::fd::{AsFd, FromRawFd, IntoRawFd, OwnedFd};
 use std::sync::{
@@ -18,8 +19,15 @@ use crate::protocols::virtual_keyboard_unstable_v1::zwp_virtual_keyboard_v1::Zwp
 use crate::model::{Action, KeyState, Plan};
 use crate::trace::plan_console_trace;
 
+#[derive(Debug, Clone)]
+struct SeatData {
+    global_name: u32,
+}
+
 #[derive(Debug, Default)]
-struct State;
+struct State {
+    seat_names_by_global: HashMap<u32, String>,
+}
 
 impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for State {
     fn event(
@@ -33,15 +41,18 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for State {
     }
 }
 
-impl Dispatch<wl_seat::WlSeat, ()> for State {
+impl Dispatch<wl_seat::WlSeat, SeatData> for State {
     fn event(
-        _state: &mut Self,
+        state: &mut Self,
         _proxy: &wl_seat::WlSeat,
-        _event: wl_seat::Event,
-        _data: &(),
+        event: wl_seat::Event,
+        data: &SeatData,
         _conn: &Connection,
         _qh: &QueueHandle<Self>,
     ) {
+        if let wl_seat::Event::Name { name } = event {
+            state.seat_names_by_global.insert(data.global_name, name);
+        }
     }
 }
 
@@ -91,7 +102,6 @@ fn make_keymap_fd(keymap: &str) -> Result<(OwnedFd, u32)> {
         .map_err(|_| anyhow!("keymap too large"))?;
 
     let raw_fd = memfd.into_file().into_raw_fd();
-    // SAFETY: raw_fd is owned (from into_raw_fd).
     let owned_fd = unsafe { OwnedFd::from_raw_fd(raw_fd) };
 
     Ok((owned_fd, size))
@@ -123,7 +133,12 @@ fn print_trace_line(line: &str) {
     }
 }
 
-pub fn play_plan(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()> {
+pub fn play_plan(
+    plan: &Plan,
+    countdown_secs: u64,
+    trace: bool,
+    seat_name: Option<&str>,
+) -> Result<()> {
     let stop = Arc::new(AtomicBool::new(false));
     {
         let stop = stop.clone();
@@ -153,13 +168,83 @@ pub fn play_plan(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()> {
     let qh = event_queue.handle();
     let mut state = State::default();
 
-    let seat: wl_seat::WlSeat = globals
-        .bind(&qh, 1..=7, ())
-        .context("failed to bind wl_seat")?;
-
     let manager: ZwpVirtualKeyboardManagerV1 = globals
         .bind(&qh, 1..=1, ())
         .context("zwp_virtual_keyboard_manager_v1 not available (is sway/wlroots exposing it?)")?;
+
+    let seat_globals: Vec<_> = globals
+        .contents()
+        .clone_list()
+        .into_iter()
+        .filter(|g| g.interface == wl_seat::WlSeat::interface().name)
+        .collect();
+
+    if seat_globals.is_empty() {
+        return Err(anyhow!("wl_seat not available (no seats advertised)"));
+    }
+
+    let seat: wl_seat::WlSeat = match seat_name {
+        Some(requested) => {
+            let mut seats = Vec::with_capacity(seat_globals.len());
+            for g in seat_globals.iter() {
+                let version = g.version.min(7);
+                let seat: wl_seat::WlSeat = globals.registry().bind(
+                    g.name,
+                    version,
+                    &qh,
+                    SeatData {
+                        global_name: g.name,
+                    },
+                );
+                seats.push((g.name, seat));
+            }
+
+            event_queue
+                .roundtrip(&mut state)
+                .context("Wayland roundtrip (seat discovery) failed")?;
+
+            if let Some(seat) = seats.iter().find_map(|(global_name, seat)| {
+                state
+                    .seat_names_by_global
+                    .get(global_name)
+                    .filter(|n| n.as_str() == requested)
+                    .map(|_| seat.clone())
+            }) {
+                seat
+            } else {
+                let mut names = state
+                    .seat_names_by_global
+                    .values()
+                    .cloned()
+                    .collect::<Vec<_>>();
+                names.sort();
+                names.dedup();
+
+                if names.is_empty() {
+                    return Err(anyhow!(
+                        "requested seat {requested:?}, but compositor did not advertise any wl_seat.name values (requires wl_seat v2+)"
+                    ));
+                }
+
+                return Err(anyhow!(
+                    "requested seat {requested:?} not found; available seats: {}",
+                    names.join(", ")
+                ));
+            }
+        }
+        None => {
+            let g = &seat_globals[0];
+            let version = g.version.min(7);
+            globals.registry().bind(
+                g.name,
+                version,
+                &qh,
+                SeatData {
+                    global_name: g.name,
+                },
+            )
+        }
+    };
 
     let keyboard: ZwpVirtualKeyboardV1 = manager.create_virtual_keyboard(&seat, &qh, ());
 
@@ -224,7 +309,6 @@ pub fn play_plan(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()> {
         return Err(anyhow!("aborted"));
     }
 
-    // Ensure requests get sent.
     conn.flush().ok();
 
     Ok(())

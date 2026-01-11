@@ -160,6 +160,10 @@ enum Command {
         #[arg(long, default_value_t = 3)]
         countdown: u64,
 
+        /// Wayland seat name to attach the virtual keyboard to (e.g. seat0, seat1).
+        #[arg(long, value_name = "NAME")]
+        seat: Option<String>,
+
         /// Disable console typing trace output
         #[arg(long)]
         no_trace: bool,
@@ -174,6 +178,10 @@ enum Command {
         /// Countdown seconds before playback starts
         #[arg(long, default_value_t = 3)]
         countdown: u64,
+
+        /// Wayland seat name to attach the virtual keyboard to (e.g. seat0, seat1).
+        #[arg(long, value_name = "NAME")]
+        seat: Option<String>,
 
         /// Disable console typing trace output
         #[arg(long)]
@@ -467,6 +475,7 @@ fn main() -> Result<()> {
         Command::Play {
             plan,
             countdown,
+            seat,
             no_trace,
         } => {
             let json = fs::read_to_string(&plan)
@@ -482,11 +491,12 @@ fn main() -> Result<()> {
                 (stats.total_wait_ms as f64) / 1000.0 / 60.0
             );
 
-            play_plan(&plan, countdown, !no_trace)?;
+            play_plan(&plan, countdown, !no_trace, seat.as_deref())?;
         }
         Command::Run {
             input,
             countdown,
+            seat,
             no_trace,
             output,
             seed,
@@ -518,7 +528,7 @@ fn main() -> Result<()> {
                 write_output(&out, &json)?;
             }
 
-            play_plan(&plan, countdown, !no_trace)?;
+            play_plan(&plan, countdown, !no_trace, seat.as_deref())?;
         }
     }
 
