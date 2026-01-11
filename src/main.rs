@@ -125,10 +125,10 @@ enum Command {
         #[arg(long)]
         seed: Option<u64>,
 
-        #[arg(long, default_value_t = 40.0)]
+        #[arg(long, default_value_t = 80.0)]
         wpm_min: f64,
 
-        #[arg(long, default_value_t = 60.0)]
+        #[arg(long, default_value_t = 120.0)]
         wpm_max: f64,
 
         /// Error probability per word (0.0-1.0)
@@ -143,7 +143,7 @@ enum Command {
         ///
         /// - chrome: current behavior; best for Chrome/Docs-like editors.
         /// - compatible: fewer Ctrl+word shortcuts; more robust across toolkits.
-        #[arg(long, value_enum, default_value_t = WordNavProfileArg::Chrome)]
+        #[arg(long, value_enum, default_value_t = WordNavProfileArg::Compatible)]
         profile: WordNavProfileArg,
 
         #[command(flatten)]
@@ -157,7 +157,7 @@ enum Command {
         plan: PathBuf,
 
         /// Countdown seconds before playback starts
-        #[arg(long, default_value_t = 3)]
+        #[arg(long, default_value_t = 5)]
         countdown: u64,
 
         /// Wayland seat name to attach the virtual keyboard to (e.g. seat0, seat1).
@@ -176,7 +176,7 @@ enum Command {
         input: PathBuf,
 
         /// Countdown seconds before playback starts
-        #[arg(long, default_value_t = 3)]
+        #[arg(long, default_value_t = 5)]
         countdown: u64,
 
         /// Wayland seat name to attach the virtual keyboard to (e.g. seat0, seat1).
@@ -195,10 +195,10 @@ enum Command {
         #[arg(long)]
         seed: Option<u64>,
 
-        #[arg(long, default_value_t = 40.0)]
+        #[arg(long, default_value_t = 80.0)]
         wpm_min: f64,
 
-        #[arg(long, default_value_t = 60.0)]
+        #[arg(long, default_value_t = 120.0)]
         wpm_max: f64,
 
         /// Error probability per word (0.0-1.0)
@@ -213,7 +213,7 @@ enum Command {
         ///
         /// - chrome: current behavior; best for Chrome/Docs-like editors.
         /// - compatible: fewer Ctrl+word shortcuts; more robust across toolkits.
-        #[arg(long, value_enum, default_value_t = WordNavProfileArg::Chrome)]
+        #[arg(long, value_enum, default_value_t = WordNavProfileArg::Compatible)]
         profile: WordNavProfileArg,
 
         #[command(flatten)]

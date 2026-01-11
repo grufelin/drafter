@@ -78,7 +78,7 @@ Play it into the focused editor:
 - `--wpm-min` / `--wpm-max`: speed range
 - `--error-rate`: probability of injecting an error per word
 - `--immediate-fix-rate`: how often an error is fixed immediately
-- `--profile <chrome|compatible>`: word navigation behavior used during corrections (default `chrome`)
+- `--profile <chrome|compatible>`: word navigation behavior used during corrections (default `compatible`)
 - `--seed`: make planning deterministic (useful for debugging)
 - `--no-trace`: disable console typing/correction trace during playback (on by default)
 - `--seat <NAME>`: Wayland seat name to attach the virtual keyboard to (play/run only; e.g. `seat0`, `seat1`)
