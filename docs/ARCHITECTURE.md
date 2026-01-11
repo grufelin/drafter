@@ -19,13 +19,13 @@ Behavioral requirements live in `docs/typing-behavior-requirements.md`.
 
 - `src/main.rs` — CLI (`plan`, `play`, `run`).
 - `src/planner.rs` — plan generation (human-like behavior + internal verification).
-- `src/playback.rs` — Wayland virtual keyboard playback (+ optional console trace output).
-- `src/trace.rs` — derive high-level `Typing`/`Replace` trace lines from low-level actions.
-- `src/model.rs` — `Plan` / `Action` types (JSON).
-- `src/keyboard.rs` — keycode constants + character→keystroke mapping.
-- `src/keymap.rs` — XKB keymap generation (US layout).
-- `src/protocols.rs` + `protocol/virtual-keyboard-unstable-v1.xml` — Wayland protocol bindings via `wayland-scanner`.
-- `tests/` — planner-focused tests.
+- `src/model.rs` — `Plan` / `Action` types.
+- `src/playback.rs` — Wayland playback via `zwp_virtual_keyboard_v1`.
+- `src/trace.rs` — derives high-level console trace from the low-level action stream.
+- `src/keyboard.rs` — evdev keycodes + ASCII character mapping.
+- `src/keymap.rs` — XKB keymap generation.
+- `src/protocols.rs` + `protocol/virtual-keyboard-unstable-v1.xml` — protocol bindings.
+- `tests/` — planner- and simulation-focused tests.
 
 ## Planning algorithm
 
@@ -235,6 +235,22 @@ CLI is intentionally thin; most logic is in the planner and playback modules.
 Provides lightweight plan statistics (action count, key events, total wait time) for UX feedback, plus `simulate_typed_text()` which applies a plan to a simple editor model for tests/debugging.
 
 `simulate_typed_text()` models basic insertion, left/right cursor movement, and backspace/delete. It does not model editor-specific behavior such as smart-quote auto-substitution.
+
+## Miscellaneous
+## Wayland/wlroots support
+
+- Playback uses the Wayland `virtual-keyboard-unstable-v1` protocol.
+- The compositor must advertise `zwp_virtual_keyboard_manager_v1`.
+- `drafter` assumes the target editor is already focused and ready for input.
+
+### Multi-seat support
+
+Playback can bind the virtual keyboard to a specific `wl_seat` by **seat name**:
+
+- CLI: `--seat <NAME>` on `play` and `run` (example: `seat0`, `seat1`).
+- Implementation: playback enumerates `wl_seat` globals, collects `wl_seat.name`, selects the requested seat, then creates the virtual keyboard bound to that seat.
+
+Important: focus is per-seat; the target editor must be focused for the chosen seat.
 
 ## Testing
 
