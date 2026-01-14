@@ -23,6 +23,7 @@ pub struct PlannerConfig {
     pub stop_corrections_after_progress: f64,
     pub review_pause_ms_min: u64,
     pub review_pause_ms_max: u64,
+    pub no_revision: bool,
 }
 
 impl Default for PlannerConfig {
@@ -38,6 +39,7 @@ impl Default for PlannerConfig {
             stop_corrections_after_progress: 0.88,
             review_pause_ms_min: 1200,
             review_pause_ms_max: 2600,
+            no_revision: false,
         }
     }
 }
@@ -758,7 +760,59 @@ pub fn generate_plan_with_phrase_alternatives(
 }
 
 pub fn generate_plan(final_text: &str, cfg: PlannerConfig, rng: &mut impl Rng) -> Result<Plan> {
+    if cfg.no_revision {
+        return generate_plan_no_revision(final_text, cfg, rng);
+    }
     generate_plan_impl(final_text, cfg, &[], rng)
+}
+
+pub fn generate_plan_no_revision(
+    final_text: &str,
+    cfg: PlannerConfig,
+    rng: &mut impl Rng,
+) -> Result<Plan> {
+    validate_config(&cfg)?;
+
+    if let Some((byte_idx, c)) = find_first_unsupported_char(final_text) {
+        let (line, col) = byte_index_to_line_col(final_text, byte_idx);
+        return Err(anyhow!(
+            "unsupported character {:?} (U+{:04X}) at line {}, column {}. Supported: ASCII, newline, and smart quotes. Tabs are not allowed.",
+            c, c as u32, line, col
+        ));
+    }
+
+    let keymap = us_qwerty_keymap()?;
+    let wpm_target = rng.gen_range(cfg.wpm_min..=cfg.wpm_max);
+
+    let mut builder = ActionBuilder::new(keymap.shift_mask, keymap.ctrl_mask);
+    let mut editor = EditorState::default();
+
+    builder.set_modifiers();
+    builder.wait(rng.gen_range(250..=600));
+
+    type_string(&mut builder, &mut editor, final_text, wpm_target, rng)?;
+
+    builder.set_shift(false, rng);
+    builder.set_ctrl(false, rng);
+    builder.set_modifiers();
+
+    let final_simulated = editor.as_string();
+    if final_simulated != final_text {
+        return Err(anyhow!(
+            "planner bug: simulated text does not match final draft"
+        ));
+    }
+
+    Ok(Plan {
+        version: 1,
+        config: PlanConfig {
+            layout: keymap.layout,
+            keymap_format: keymap.keymap_format,
+            keymap: keymap.keymap,
+            wpm_target,
+        },
+        actions: builder.into_actions(),
+    })
 }
 
 fn generate_plan_impl(
