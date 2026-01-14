@@ -125,6 +125,9 @@ This section describes the human-like typing/editing behaviors `drafter` can emu
 - **Smart quotes in the final draft (`’‘”“`)**
   - Algorithm: the planner tracks the Unicode characters in the final draft, but emits ASCII keystrokes (`'` and `"`) and relies on editor auto-substitution (e.g. Google Docs smart quotes) so the final editor text can match the draft.
 
+- **No-revision mode (`--no-revision`)**
+  - Algorithm: types the draft straight through with human-like timing but no intentional errors, typos, variations, or corrections. Useful when you want clean typing without revision behavior.
+
 ### Not yet supported
 
 - **General Unicode typing** (beyond `’‘”“`) and **non-US keyboard layouts**.
