@@ -15,24 +15,25 @@ The tool never reads editor contents; correctness is enforced by the planner’s
 
 ## Workflow
 
-Start here with key docs here, which can help you undertand the project and explore codebase easier:
+- For major jobs, at the start of a session, create a new task log in `docs/tasks/` named `YYYY-MM-DD_HHMM_<slug>.md`. As you research and work, keep the task log updated with what you explore/consider/plan/implement.
 
-- `docs/ARCHITECTURE.md` — architecture, module map, planner algorithm, playback overview
-- `docs/typing-behavior-requirements.md` — key allowlist and behavioral constraints
+- The consult these documents; they will help you have an easier understand the project and pull the right context:
+  - `docs/ARCHITECTURE.md` — architecture, module map, planner algorithm, playback overview
+  - `docs/typing-behavior-requirements.md` — key allowlist and behavioral constraints
 
-For major jobs, create and keep a short working note in `docs/tasks/`:
-
-- One file per job: `docs/tasks/YYYY-MM-DD-<short-slug>.md`
-- Update this log with your observations, thinking, and action as you proceed through the job: goal, current state, , approach, decisions, progress, etc.
-
-### Interpreting user requests
-- If the user says **“update doc”**, update the relevant parts of all relevant docs/files (inside and outside `docs/`) so everything stays consistent.
+- When the user asks you to update documentation (only do this when asked), use this guide to decide what to update:
   - CLI options / CLI usage: update `README.md`.
   - Architecture changes: update `docs/ARCHITECTURE.md`.
   - Key allowlist and behavioral constraints changes: update `docs/typing-behavior-requirements.md.md`.
-  - Technical requirements (coding styles, library usage, dev tools): update `AGENTS.md` (keep it very concise).
-- If the user says **“commit”**, make small, focused commits grouping related files.
-- If the user says **“prepare to write the handoff document**, propose a few next tasks; after the user approves, update this documeent (`docs/HANDOFF.md`) with fresh context + the agreed next tasks for the next session.
+  - Technical requirements (stack, tooling, testing, building, coding styles, etc.): update `AGENTS.md` (keep it very concise).
+- When the user asks you to make commits, make small, focused commits grouping related files.
+- When the user asks you to write the handoff document, update this documeent (`docs/HANDOFF.md`) with fresh context
+
+### Documentation Principles
+
+- Use descriptive behavioral language:
+  - Describe user actions step-by-step: "User clicks X → component emits Y → host does Z"
+  - Show data and action flows with arrows such as `ComponentA → ComponentB`
 
 ## Non-negotiable safety constraints
 
