@@ -43,6 +43,23 @@ enum LlmFailurePolicy {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum PlaybackBackendArg {
+    Auto,
+    Wayland,
+    X11,
+}
+
+impl PlaybackBackendArg {
+    fn to_library(self) -> drafter::playback::PlaybackBackend {
+        match self {
+            PlaybackBackendArg::Auto => drafter::playback::PlaybackBackend::Auto,
+            PlaybackBackendArg::Wayland => drafter::playback::PlaybackBackend::Wayland,
+            PlaybackBackendArg::X11 => drafter::playback::PlaybackBackend::X11,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
 enum WordNavProfileArg {
     /// Current behavior; best for Chrome/Docs-like editors.
     Chrome,
@@ -154,6 +171,14 @@ enum Command {
 
     /// Play a plan into the currently focused editor
     Play {
+        /// Playback backend.
+        ///
+        /// - auto: choose a backend based on the runtime environment
+        /// - wayland: force Wayland playback
+        /// - x11: (not supported yet)
+        #[arg(long, value_enum, default_value_t = PlaybackBackendArg::Auto)]
+        backend: PlaybackBackendArg,
+
         /// Plan file (JSON)
         #[arg(long, value_name = "PATH")]
         plan: PathBuf,
@@ -173,6 +198,14 @@ enum Command {
 
     /// Generate a plan then immediately play it
     Run {
+        /// Playback backend.
+        ///
+        /// - auto: choose a backend based on the runtime environment
+        /// - wayland: force Wayland playback
+        /// - x11: (not supported yet)
+        #[arg(long, value_enum, default_value_t = PlaybackBackendArg::Auto)]
+        backend: PlaybackBackendArg,
+
         /// Input text file, or '-' for stdin
         #[arg(long, value_name = "PATH")]
         input: PathBuf,
@@ -485,9 +518,13 @@ fn main() -> Result<()> {
         Command::Play {
             plan,
             countdown,
+            backend,
             seat,
             no_trace,
         } => {
+            // Fail fast on unsupported environments/backends.
+            drafter::playback::resolve_backend(backend.to_library())?;
+
             let json = fs::read_to_string(&plan)
                 .with_context(|| format!("failed to read {}", plan.display()))?;
             let plan: drafter::model::Plan =
@@ -501,11 +538,18 @@ fn main() -> Result<()> {
                 (stats.total_wait_ms as f64) / 1000.0 / 60.0
             );
 
-            play_plan(&plan, countdown, !no_trace, seat.as_deref())?;
+            play_plan(
+                &plan,
+                countdown,
+                !no_trace,
+                seat.as_deref(),
+                backend.to_library(),
+            )?;
         }
         Command::Run {
             input,
             countdown,
+            backend,
             seat,
             no_trace,
             output,
@@ -517,6 +561,9 @@ fn main() -> Result<()> {
             profile,
             llm,
         } => {
+            // Fail fast on unsupported environments/backends.
+            drafter::playback::resolve_backend(backend.to_library())?;
+
             let final_text = read_input(&input)?;
             let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile);
             let mut rng = rng_from_seed(seed);
@@ -538,7 +585,13 @@ fn main() -> Result<()> {
                 write_output(&out, &json)?;
             }
 
-            play_plan(&plan, countdown, !no_trace, seat.as_deref())?;
+            play_plan(
+                &plan,
+                countdown,
+                !no_trace,
+                seat.as_deref(),
+                backend.to_library(),
+            )?;
         }
     }
 

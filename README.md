@@ -82,6 +82,7 @@ Play it into the focused editor:
 - `--seed`: make planning deterministic (useful for debugging)
 - `--no-trace`: disable console typing/correction trace during playback (on by default)
 - `--seat <NAME>`: Wayland seat name to attach the virtual keyboard to (play/run only; e.g. `seat0`, `seat1`)
+- `--backend <auto|wayland|x11>`: select playback backend (play/run only; default `auto`). `x11` is not supported yet.
 
 ### LLM phrasing
 

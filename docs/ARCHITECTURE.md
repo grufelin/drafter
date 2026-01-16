@@ -20,7 +20,7 @@ Behavioral requirements live in `docs/typing-behavior-requirements.md`.
 - `src/main.rs` — CLI (`plan`, `play`, `run`).
 - `src/planner.rs` — plan generation (human-like behavior + internal verification).
 - `src/model.rs` — `Plan` / `Action` types.
-- `src/playback.rs` — Wayland playback via `zwp_virtual_keyboard_v1`.
+- `src/playback/` — playback backend selection + implementations (Wayland via `zwp_virtual_keyboard_v1`).
 - `src/trace.rs` — derives high-level console trace from the low-level action stream.
 - `src/keyboard.rs` — evdev keycodes + ASCII character mapping.
 - `src/keymap.rs` — XKB keymap generation.
@@ -206,7 +206,7 @@ Wayland bindings for `virtual-keyboard-unstable-v1` are generated at compile tim
 
 This avoids depending on external protocol packages at runtime.
 
-### Playback (`src/playback.rs`)
+### Playback (`src/playback/`)
 
 Playback:
 

@@ -13,10 +13,9 @@ use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::{wl_registry, wl_seat};
 use wayland_client::{Connection, Dispatch, Proxy, QueueHandle};
 
+use crate::model::{Action, KeyState, Plan};
 use crate::protocols::virtual_keyboard_unstable_v1::zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1;
 use crate::protocols::virtual_keyboard_unstable_v1::zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1;
-
-use crate::model::{Action, KeyState, Plan};
 use crate::trace::plan_console_trace;
 
 #[derive(Debug, Clone)]
@@ -133,7 +132,7 @@ fn print_trace_line(line: &str) {
     }
 }
 
-pub fn play_plan(
+pub fn play_plan_wayland(
     plan: &Plan,
     countdown_secs: u64,
     trace: bool,
