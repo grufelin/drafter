@@ -76,15 +76,14 @@ Play it into the focused editor:
 ### Tuning
 
 - `--wpm-min` / `--wpm-max`: speed range
-- `--error-rate`: probability of injecting an error per word
+- `--error-rate`: probability of injecting an error per word (set to `0` for straight-through typing with no errors/corrections; incompatible with `--llm`)
 - `--immediate-fix-rate`: how often an error is fixed immediately
 - `--profile <chrome|compatible>`: word navigation behavior used during corrections (default `compatible`)
 - `--seed`: make planning deterministic (useful for debugging)
 - `--no-trace`: disable console typing/correction trace during playback (on by default)
 - `--seat <NAME>`: Wayland seat name to attach the virtual keyboard to (play/run only; e.g. `seat0`, `seat1`)
-- `--no-revision`: type the draft straight through without any errors or corrections (incompatible with `--llm`, `--error-rate`, `--immediate-fix-rate`)
 
-### Experimental LLM phrasing
+### LLM phrasing
 
 When built with `--features llm`, `plan` and `run` can request paragraph-local phrase alternatives from OpenRouter, temporarily type them, and later edit them back so the final text matches the input exactly.
 

@@ -131,7 +131,9 @@ enum Command {
         #[arg(long, default_value_t = 120.0)]
         wpm_max: f64,
 
-        /// Error probability per word (0.0-1.0)
+        /// Error probability per word (0.0-1.0).
+        ///
+        /// Set to 0 for straight-through typing (no revisions/corrections).
         #[arg(long, default_value_t = 0.05)]
         error_rate: f64,
 
@@ -145,12 +147,6 @@ enum Command {
         /// - compatible: fewer Ctrl+word shortcuts; more robust across toolkits.
         #[arg(long, value_enum, default_value_t = WordNavProfileArg::Compatible)]
         profile: WordNavProfileArg,
-
-        /// Type the draft straight through without any errors or corrections.
-        ///
-        /// Incompatible with --llm, --error-rate, and --immediate-fix-rate.
-        #[arg(long, conflicts_with_all = ["llm", "error_rate", "immediate_fix_rate"])]
-        no_revision: bool,
 
         #[command(flatten)]
         llm: LlmArgs,
@@ -207,7 +203,9 @@ enum Command {
         #[arg(long, default_value_t = 120.0)]
         wpm_max: f64,
 
-        /// Error probability per word (0.0-1.0)
+        /// Error probability per word (0.0-1.0).
+        ///
+        /// Set to 0 for straight-through typing (no revisions/corrections).
         #[arg(long, default_value_t = 0.05)]
         error_rate: f64,
 
@@ -221,12 +219,6 @@ enum Command {
         /// - compatible: fewer Ctrl+word shortcuts; more robust across toolkits.
         #[arg(long, value_enum, default_value_t = WordNavProfileArg::Compatible)]
         profile: WordNavProfileArg,
-
-        /// Type the draft straight through without any errors or corrections.
-        ///
-        /// Incompatible with --llm, --error-rate, and --immediate-fix-rate.
-        #[arg(long, conflicts_with_all = ["llm", "error_rate", "immediate_fix_rate"])]
-        no_revision: bool,
 
         #[command(flatten)]
         llm: LlmArgs,
@@ -265,7 +257,6 @@ fn build_config(
     error_rate: f64,
     immediate_fix_rate: f64,
     profile: WordNavProfileArg,
-    no_revision: bool,
 ) -> PlannerConfig {
     PlannerConfig {
         wpm_min,
@@ -273,7 +264,6 @@ fn build_config(
         error_rate_per_word: error_rate,
         immediate_fix_rate,
         word_nav_profile: profile.to_library(),
-        no_revision,
         ..Default::default()
     }
 }
@@ -323,6 +313,12 @@ fn maybe_generate_plan(
     llm: &LlmArgs,
     rng: &mut StdRng,
 ) -> Result<drafter::model::Plan> {
+    if llm.llm && cfg.error_rate_per_word == 0.0 {
+        return Err(anyhow!(
+            "--llm is incompatible with --error-rate 0 (no-revision mode)"
+        ));
+    }
+
     if !llm.llm {
         return generate_plan(final_text, cfg, rng);
     }
@@ -462,11 +458,10 @@ fn main() -> Result<()> {
             error_rate,
             immediate_fix_rate,
             profile,
-            no_revision,
             llm,
         } => {
             let final_text = read_input(&input)?;
-            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile, no_revision);
+            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile);
             let mut rng = rng_from_seed(seed);
 
             let plan = maybe_generate_plan(&final_text, cfg, &llm, &mut rng)?;
@@ -520,11 +515,10 @@ fn main() -> Result<()> {
             error_rate,
             immediate_fix_rate,
             profile,
-            no_revision,
             llm,
         } => {
             let final_text = read_input(&input)?;
-            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile, no_revision);
+            let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile);
             let mut rng = rng_from_seed(seed);
 
             let plan = maybe_generate_plan(&final_text, cfg, &llm, &mut rng)?;
