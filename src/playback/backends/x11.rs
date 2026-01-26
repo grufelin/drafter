@@ -240,7 +240,7 @@ pub fn play_plan_x11(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()
     let focus = get_focus(&conn)?;
     // X11 special focus value: PointerRoot means the focused window follows the pointer.
     // (`focus` is a `Window` newtype in the protocol, but x11rb models it as `u32`.)
-    const POINTER_ROOT: u32 = 1;
+    const POINTER_ROOT: xproto::Window = 1;
     if focus.focus == x11rb::NONE {
         return Err(anyhow!(
             "no X11 input focus detected; click into the target editor before starting"

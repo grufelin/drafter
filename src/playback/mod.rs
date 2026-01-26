@@ -118,7 +118,7 @@ fn require_supported_backend(selected: PlaybackBackend, resolved: PlaybackBacken
             PlaybackBackend::Wayland => {
                 anyhow!("Wayland backend selected but not available/unsupported. {err:#}")
             }
-            PlaybackBackend::X11 => err,
+            PlaybackBackend::X11 => anyhow!("X11 backend selected but not available/unsupported. {err:#}"),
             PlaybackBackend::Auto => err,
         }
     })

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::keyboard::{
     keystroke_for_output_char, KEY_BACKSPACE, KEY_DELETE, KEY_DOWN, KEY_END, KEY_HOME, KEY_LEFT,
-    KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_RIGHT, KEY_RIGHTSHIFT, KEY_UP,
+    KEY_LEFTCTRL, KEY_LEFTSHIFT, KEY_RIGHT, KEY_RIGHTCTRL, KEY_RIGHTSHIFT, KEY_UP,
 };
 use crate::model::{Action, KeyState};
 
@@ -191,7 +191,7 @@ impl PlaybackTracer {
             self.shift_down = true;
             return;
         }
-        if keycode == KEY_LEFTCTRL {
+        if keycode == KEY_LEFTCTRL || keycode == KEY_RIGHTCTRL {
             self.ctrl_down = true;
             return;
         }
@@ -263,7 +263,7 @@ impl PlaybackTracer {
         if keycode == KEY_LEFTSHIFT || keycode == KEY_RIGHTSHIFT {
             self.shift_down = false;
         }
-        if keycode == KEY_LEFTCTRL {
+        if keycode == KEY_LEFTCTRL || keycode == KEY_RIGHTCTRL {
             self.ctrl_down = false;
         }
     }
@@ -424,7 +424,7 @@ impl TracePlanner {
             self.shift_down = true;
             return;
         }
-        if keycode == KEY_LEFTCTRL {
+        if keycode == KEY_LEFTCTRL || keycode == KEY_RIGHTCTRL {
             self.ctrl_down = true;
             return;
         }
@@ -516,7 +516,7 @@ impl TracePlanner {
         if keycode == KEY_LEFTSHIFT || keycode == KEY_RIGHTSHIFT {
             self.shift_down = false;
         }
-        if keycode == KEY_LEFTCTRL {
+        if keycode == KEY_LEFTCTRL || keycode == KEY_RIGHTCTRL {
             self.ctrl_down = false;
         }
     }
