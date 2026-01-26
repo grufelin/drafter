@@ -19,10 +19,11 @@ fn env_is_set(name: &str) -> bool {
 
 fn auto_backend() -> PlaybackBackend {
     // Prefer Wayland if both are present (common in Wayland sessions with Xwayland).
-    if env_is_set("WAYLAND_DISPLAY") || env_is_set("WAYLAND_SOCKET") {
+    if cfg!(feature = "wayland") && (env_is_set("WAYLAND_DISPLAY") || env_is_set("WAYLAND_SOCKET"))
+    {
         return PlaybackBackend::Wayland;
     }
-    if env_is_set("DISPLAY") {
+    if cfg!(feature = "x11") && env_is_set("DISPLAY") {
         return PlaybackBackend::X11;
     }
 
@@ -57,16 +58,58 @@ fn backend_unavailable_message() -> String {
 
 fn require_supported_backend(selected: PlaybackBackend, resolved: PlaybackBackend) -> Result<()> {
     match resolved {
-        PlaybackBackend::Wayland => Ok(()),
-        PlaybackBackend::X11 => Err(anyhow!(
-            "X11 backend selected/detected but is not supported yet. {details}",
-            details = backend_unavailable_message()
-        )),
-        PlaybackBackend::Auto => Err(anyhow!(
-            "No supported playback backend detected. {details} \n\
-             Try running in a Wayland session, or pass --backend wayland to force it.",
-            details = backend_unavailable_message()
-        )),
+        PlaybackBackend::Wayland => {
+            #[cfg(feature = "wayland")]
+            {
+                Ok(())
+            }
+
+            #[cfg(not(feature = "wayland"))]
+            {
+                Err(anyhow!(
+                    "Wayland backend selected/detected but is disabled in this build. (Rebuild with `--features wayland`.) {details}",
+                    details = backend_unavailable_message()
+                ))
+            }
+        }
+        PlaybackBackend::X11 => {
+            #[cfg(feature = "x11")]
+            {
+                Ok(())
+            }
+
+            #[cfg(not(feature = "x11"))]
+            {
+                Err(anyhow!(
+                    "X11 backend selected/detected but is disabled in this build. (Rebuild with `--features x11`.) {details}",
+                    details = backend_unavailable_message()
+                ))
+            }
+        }
+        PlaybackBackend::Auto => {
+            let mut forced = Vec::new();
+            if cfg!(feature = "wayland") {
+                forced.push("--backend wayland");
+            }
+            if cfg!(feature = "x11") {
+                forced.push("--backend x11");
+            }
+            let hint = if forced.is_empty() {
+                "This build has no playback backends enabled."
+            } else if forced.len() == 1 {
+                "Try passing the available backend flag to force it."
+            } else {
+                "Try forcing a backend."
+            };
+
+            Err(anyhow!(
+                "No supported playback backend detected. {details} \n\
+                 {hint} {}",
+                forced.join(" or "),
+                details = backend_unavailable_message(),
+                hint = hint,
+            ))
+        }
     }
     .map_err(|err| {
         // Improve the error slightly if the user explicitly requested a backend.
@@ -97,13 +140,45 @@ pub fn play_plan(
     seat_name: Option<&str>,
     backend: PlaybackBackend,
 ) -> Result<()> {
+    #[cfg(all(not(feature = "wayland"), not(feature = "x11")))]
+    let _ = (plan, countdown_secs, trace, seat_name);
+
     let backend = resolve_backend(backend)?;
 
     match backend {
         PlaybackBackend::Wayland => {
-            backends::wayland::play_plan_wayland(plan, countdown_secs, trace, seat_name)
+            #[cfg(feature = "wayland")]
+            {
+                backends::wayland::play_plan_wayland(plan, countdown_secs, trace, seat_name)
+            }
+
+            #[cfg(not(feature = "wayland"))]
+            {
+                let _ = seat_name;
+                Err(anyhow!(
+                    "Wayland backend is disabled in this build (rebuild with `--features wayland`)."
+                ))
+            }
         }
-        PlaybackBackend::X11 => Err(anyhow!("X11 backend is not supported yet")),
+        PlaybackBackend::X11 => {
+            if seat_name.is_some() {
+                return Err(anyhow!(
+                    "--seat is Wayland-only and is not supported on X11"
+                ));
+            }
+
+            #[cfg(feature = "x11")]
+            {
+                backends::x11::play_plan_x11(plan, countdown_secs, trace)
+            }
+
+            #[cfg(not(feature = "x11"))]
+            {
+                Err(anyhow!(
+                    "X11 backend is disabled in this build (rebuild with `--features x11`)."
+                ))
+            }
+        }
         PlaybackBackend::Auto => Err(anyhow!("no backend resolved")),
     }
 }

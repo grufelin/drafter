@@ -120,7 +120,7 @@ struct LlmArgs {
 
 #[derive(Debug, Parser)]
 #[command(name = "drafter")]
-#[command(about = "Human-like typing simulator for Wayland editors", long_about = None)]
+#[command(about = "Human-like typing simulator for Wayland and X11 editors", long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -175,7 +175,7 @@ enum Command {
         ///
         /// - auto: choose a backend based on the runtime environment
         /// - wayland: force Wayland playback
-        /// - x11: (not supported yet)
+        /// - x11: force X11 playback (XTEST)
         #[arg(long, value_enum, default_value_t = PlaybackBackendArg::Auto)]
         backend: PlaybackBackendArg,
 
@@ -202,7 +202,7 @@ enum Command {
         ///
         /// - auto: choose a backend based on the runtime environment
         /// - wayland: force Wayland playback
-        /// - x11: (not supported yet)
+        /// - x11: force X11 playback (XTEST)
         #[arg(long, value_enum, default_value_t = PlaybackBackendArg::Auto)]
         backend: PlaybackBackendArg,
 
