@@ -41,6 +41,7 @@ pub const KEY_RIGHTBRACE: u32 = 27;
 pub const KEY_ENTER: u32 = 28;
 
 pub const KEY_LEFTCTRL: u32 = 29;
+pub const KEY_RIGHTCTRL: u32 = 97;
 
 pub const KEY_A: u32 = 30;
 pub const KEY_S: u32 = 31;
