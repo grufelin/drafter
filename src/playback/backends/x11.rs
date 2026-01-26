@@ -2,7 +2,6 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use std::time::Duration;
 
 use anyhow::{anyhow, Context, Result};
 use x11rb::connection::Connection;
@@ -11,33 +10,8 @@ use x11rb::protocol::xtest::ConnectionExt as _;
 use x11rb::protocol::{xproto, xtest};
 
 use crate::model::{Action, KeyState, Plan};
+use crate::playback::util::{print_trace_line, sleep_interruptible};
 use crate::trace::plan_console_trace;
-
-fn sleep_interruptible(stop: &AtomicBool, ms: u64) {
-    let mut remaining = ms;
-    while remaining > 0 {
-        if stop.load(Ordering::SeqCst) {
-            return;
-        }
-        let step = remaining.min(50);
-        std::thread::sleep(Duration::from_millis(step));
-        remaining -= step;
-    }
-}
-
-fn print_trace_line(line: &str) {
-    const RESET: &str = "\x1b[0m";
-    const TYPING: &str = "\x1b[34m";
-    const REPLACE: &str = "\x1b[33m";
-
-    if let Some(rest) = line.strip_prefix("Typing") {
-        eprintln!("{TYPING}Typing{RESET}{rest}");
-    } else if let Some(rest) = line.strip_prefix("Replace") {
-        eprintln!("{REPLACE}Replace{RESET}{rest}");
-    } else {
-        eprintln!("{line}");
-    }
-}
 
 fn evdev_to_x11_keycode(evdev_keycode: u32) -> Result<u8> {
     // On most Linux Xorg setups, X11 keycodes are evdev + 8.
@@ -150,6 +124,7 @@ fn validate_us_keymap(conn: &impl Connection) -> Result<()> {
     ];
 
     let mut no_symbol_count = 0usize;
+    let mut first_no_symbol: Option<(u8, xproto::Keysym, xproto::Keysym)> = None;
     let mut first_mismatch: Option<(u8, xproto::Keysym, xproto::Keysym)> = None;
 
     for (evdev, unshifted, shifted) in checks {
@@ -160,6 +135,10 @@ fn validate_us_keymap(conn: &impl Connection) -> Result<()> {
 
         if got0 == x11rb::NO_SYMBOL || got1 == x11rb::NO_SYMBOL {
             no_symbol_count += 1;
+            if first_no_symbol.is_none() {
+                first_no_symbol = Some((keycode, got0, got1));
+            }
+            continue;
         }
 
         if (got0 != *unshifted || got1 != *shifted) && first_mismatch.is_none() {
@@ -167,9 +146,15 @@ fn validate_us_keymap(conn: &impl Connection) -> Result<()> {
         }
     }
 
-    if no_symbol_count >= 3 {
+    if no_symbol_count > 0 {
+        let extra = if let Some((keycode, got0, got1)) = first_no_symbol {
+            format!(" (example keycode {keycode}: got {got0:#x}/{got1:#x})")
+        } else {
+            String::new()
+        };
+
         return Err(anyhow!(
-            "X11 backend assumes X11 keycodes are evdev+8, but the X server did not return expected keysyms for multiple representative keys. This backend may not work on unusual X keycode mappings."
+            "X11 backend could not validate the X server keymap because some representative keys returned NoSymbol{extra}. This backend assumes X11 keycodes are evdev+8 and currently requires a US keymap; unusual server keycode mappings may not work."
         ));
     }
 
@@ -253,6 +238,8 @@ pub fn play_plan_x11(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()
 
     // Sanity check: require explicit input focus.
     let focus = get_focus(&conn)?;
+    // X11 special focus value: PointerRoot means the focused window follows the pointer.
+    // (`focus` is a `Window` newtype in the protocol, but x11rb models it as `u32`.)
     const POINTER_ROOT: u32 = 1;
     if focus.focus == x11rb::NONE {
         return Err(anyhow!(
