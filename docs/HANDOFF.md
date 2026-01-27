@@ -1,6 +1,6 @@
 # drafter
 
-`drafter` is a Linux/Wayland typing simulator: given a “final draft” plain-text input, it **plans** a full sequence of human-like keyboard events and then **plays** them into the currently focused editor so the editor ends up matching the provided draft.
+`drafter` is a Linux typing simulator for Wayland and X11: given a “final draft” plain-text input, it **plans** a full sequence of human-like keyboard events and then **plays** them into the currently focused editor so the editor ends up matching the provided draft.
 
 This file is meant to give new agents enough context to explore the repo safely and effectively.
 
@@ -9,7 +9,9 @@ This file is meant to give new agents enough context to explore the repo safely 
 `drafter` has two phases:
 
 1. **Plan**: Convert the final draft text into a fully precomputed list of low-level keyboard actions (`Key` press/release, `Modifiers`, and `Wait`).
-2. **Play**: Connect to Wayland, create a virtual keyboard (`virtual-keyboard-unstable-v1`), set an XKB keymap, then replay the planned actions into the focused surface.
+2. **Play**: Replay the planned actions into the currently focused surface using either:
+   - **Wayland**: `virtual-keyboard-unstable-v1` virtual keyboard + XKB keymap.
+   - **X11**: XTEST synthetic `KeyPress`/`KeyRelease` events (requires XTEST and a compatible server keymap).
 
 The tool never reads editor contents; correctness is enforced by the planner’s internal simulation.
 

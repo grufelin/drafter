@@ -5,7 +5,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use anyhow::{anyhow, Context, Result};
 use memfd::MemfdOptions;
@@ -13,10 +13,10 @@ use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::{wl_registry, wl_seat};
 use wayland_client::{Connection, Dispatch, Proxy, QueueHandle};
 
+use crate::model::{Action, KeyState, Plan};
+use crate::playback::util::{print_trace_line, sleep_interruptible};
 use crate::protocols::virtual_keyboard_unstable_v1::zwp_virtual_keyboard_manager_v1::ZwpVirtualKeyboardManagerV1;
 use crate::protocols::virtual_keyboard_unstable_v1::zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1;
-
-use crate::model::{Action, KeyState, Plan};
 use crate::trace::plan_console_trace;
 
 #[derive(Debug, Clone)]
@@ -107,33 +107,7 @@ fn make_keymap_fd(keymap: &str) -> Result<(OwnedFd, u32)> {
     Ok((owned_fd, size))
 }
 
-fn sleep_interruptible(stop: &AtomicBool, ms: u64) {
-    let mut remaining = ms;
-    while remaining > 0 {
-        if stop.load(Ordering::SeqCst) {
-            return;
-        }
-        let step = remaining.min(50);
-        std::thread::sleep(Duration::from_millis(step));
-        remaining -= step;
-    }
-}
-
-fn print_trace_line(line: &str) {
-    const RESET: &str = "\x1b[0m";
-    const TYPING: &str = "\x1b[34m";
-    const REPLACE: &str = "\x1b[33m";
-
-    if let Some(rest) = line.strip_prefix("Typing") {
-        eprintln!("{TYPING}Typing{RESET}{rest}");
-    } else if let Some(rest) = line.strip_prefix("Replace") {
-        eprintln!("{REPLACE}Replace{RESET}{rest}");
-    } else {
-        eprintln!("{line}");
-    }
-}
-
-pub fn play_plan(
+pub fn play_plan_wayland(
     plan: &Plan,
     countdown_secs: u64,
     trace: bool,

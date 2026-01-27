@@ -4,6 +4,8 @@ pub mod llm;
 pub mod model;
 pub mod planner;
 pub mod playback;
+
+#[cfg(feature = "wayland")]
 pub mod protocols;
 pub mod sim;
 pub mod trace;

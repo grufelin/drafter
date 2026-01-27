@@ -5,7 +5,9 @@
 `drafter` has two distinct phases:
 
 1. **Plan**: turn a final draft text into a fully-expanded sequence of low-level keyboard actions (key presses/releases, modifier updates, and waits).
-2. **Play**: connect to Wayland, create a virtual keyboard, set its keymap, then replay the precomputed action sequence into the currently focused surface.
+2. **Play**: replay the precomputed action sequence into the currently focused surface using either:
+   - **Wayland**: a virtual keyboard (`virtual-keyboard-unstable-v1`) with an XKB keymap.
+   - **X11**: XTEST synthetic key events.
 
 This separation is intentional:
 
@@ -20,11 +22,11 @@ Behavioral requirements live in `docs/typing-behavior-requirements.md`.
 - `src/main.rs` — CLI (`plan`, `play`, `run`).
 - `src/planner.rs` — plan generation (human-like behavior + internal verification).
 - `src/model.rs` — `Plan` / `Action` types.
-- `src/playback.rs` — Wayland playback via `zwp_virtual_keyboard_v1`.
+- `src/playback/` — playback backend selection + implementations (Wayland via `zwp_virtual_keyboard_v1`, X11 via XTEST).
 - `src/trace.rs` — derives high-level console trace from the low-level action stream.
 - `src/keyboard.rs` — evdev keycodes + ASCII character mapping.
 - `src/keymap.rs` — XKB keymap generation.
-- `src/protocols.rs` + `protocol/virtual-keyboard-unstable-v1.xml` — protocol bindings.
+- `src/protocols.rs` + `protocol/virtual-keyboard-unstable-v1.xml` — Wayland protocol bindings (Wayland feature only).
 - `tests/` — planner- and simulation-focused tests.
 
 ## Planning algorithm
@@ -74,7 +76,7 @@ The planner is responsible for these decisions; playback is a simple, timing-foc
 ## Data flow
 
 - Input text (`draft.txt`) → `planner::generate_plan()` → `model::Plan` (serializable JSON)
-- `model::Plan` → `playback::play_plan()` → Wayland `zwp_virtual_keyboard_v1` events
+- `model::Plan` → `playback::play_plan()` → keyboard events via Wayland (`zwp_virtual_keyboard_v1`) or X11 (XTEST)
 
 At runtime, `drafter` always assumes the editor is already focused and ready for insertion at the caret.
 
@@ -206,20 +208,46 @@ Wayland bindings for `virtual-keyboard-unstable-v1` are generated at compile tim
 
 This avoids depending on external protocol packages at runtime.
 
-### Playback (`src/playback.rs`)
+### Playback (`src/playback/`)
 
-Playback:
+Playback has two backends (select via `--backend <auto|wayland|x11>`):
 
-- Connects to Wayland and binds:
-  - `wl_seat` (selects the requested seat name when provided)
-  - `zwp_virtual_keyboard_manager_v1`
-- Creates a `zwp_virtual_keyboard_v1` tied to the selected seat.
-- Sends the XKB keymap via `keymap()`.
-- Replays each action:
-  - `Wait` → sleeps
-  - `Modifiers` → sends `zwp_virtual_keyboard_v1.modifiers()`
-  - `Key` → sends `zwp_virtual_keyboard_v1.key()` with a monotonic “time since start” timestamp
-- Optionally prints a high-level console trace derived from the action stream (enabled by default; disable with `--no-trace`).
+Backend selection:
+
+- `auto` prefers Wayland when both Wayland and X11 environment variables are present (common in Wayland sessions with Xwayland).
+- Selection respects compile-time feature flags: a backend that is compiled out will never be auto-selected, and requesting it errors with a “disabled in this build” message.
+
+- **Wayland** (feature `wayland`, enabled by default):
+  - Connects to Wayland and binds `wl_seat` + `zwp_virtual_keyboard_manager_v1`.
+  - Creates a `zwp_virtual_keyboard_v1` tied to the selected seat.
+  - Sends the XKB keymap via `keymap()`.
+  - Replays:
+    - `Wait` → sleeps
+    - `Modifiers` → `zwp_virtual_keyboard_v1.modifiers()`
+    - `Key` → `zwp_virtual_keyboard_v1.key()` with a monotonic “time since start” timestamp
+
+- **X11** (feature `x11`, enabled by default):
+  - Connects to the X server and injects key events via the XTEST extension.
+  - X11 cannot receive a per-client keymap, so the backend validates the *server* keymap is US-QWERTY before playing.
+  - Guardrails / preflight checks (fail fast):
+    - **XTEST required**: if the X server does not advertise the XTEST extension, playback errors.
+    - **Explicit focus required**: queries input focus once before playback and errors if focus is `None` or `PointerRoot`.
+      - This prevents “focus follows mouse” setups from sending keystrokes to whichever window the pointer happens to be over.
+      - This check uses only window IDs (no reading window contents).
+    - **US keymap required**: validates representative keysyms via `GetKeyboardMapping` using the common Linux mapping assumption `x11_keycode = evdev_keycode + 8`.
+      - If multiple keys return `NoSymbol`, playback errors with an explicit note about the `evdev+8` assumption (it likely indicates an unusual server keycode mapping).
+      - If keysyms are present but do not match US, playback errors and suggests `setxkbmap us`.
+  - Replays:
+    - `Wait` → sleeps
+    - `Key` → XTEST `FakeInput` `KeyPress`/`KeyRelease`
+    - `Modifiers` → no-op (the planner emits explicit Shift/Ctrl key presses/releases).
+  - Other X11-specific behavior:
+    - `--seat` is rejected (seat selection is Wayland-only).
+    - X11 connection flush failures are treated as errors during playback (avoid “silent success” if the connection drops).
+    - Before playback, best-effort releases common modifiers to start from a neutral state.
+    - On abort (Ctrl+C), best-effort releases common modifiers to avoid leaving a stuck modifier.
+
+Both backends can print a high-level console trace derived from the action stream (enabled by default; disable with `--no-trace`).
 
 A Ctrl+C handler is installed to abort playback and attempt to reset modifiers.
 

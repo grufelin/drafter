@@ -1,107 +1,126 @@
 # drafter
 
-`drafter` is a Linux/Wayland typing simulator: given a “final draft” text, it produces a human-like stream of keyboard events (variable speed, pauses, mistakes, edits, and later corrections) so that an editor such as Google Docs ends up with the final draft.
+`drafter` is a Linux typing simulator: given a “final draft” text, it produces a human-like stream of keyboard events (variable speed, pauses, mistakes, edits, and later corrections) so that a text input area (such as an editor) ends up with the final draft.
 
-This project targets Sway (wlroots) and uses the Wayland `virtual-keyboard-unstable-v1` protocol (compositor-protocol-only; no `uinput`).
-
-## What it does
-
-- Types character-by-character with human-like timing (~40–60 WPM average, with jitter)
-- Injects occasional divergences (typos and small word-level variations)
-- Fixes some immediately and others later
-- Always performs a near-end “review pass” to fix remaining issues
-- Emits keyboard events only (no clipboard)
-
-Behavior is guided by `docs/typing-behavior-requirements.md`. Architecture and planning internals are in `docs/ARCHITECTURE.md`.
-
-## Requirements
-
-- Linux + Wayland session
-- Sway compositor
-- Sway/wlroots must expose `zwp_virtual_keyboard_manager_v1` to clients (the tool errors if the protocol isn’t advertised)
-- A US-QWERTY layout is assumed for keystroke mapping
-
-System libraries for building:
-
-- `libwayland-client`
-- `libxkbcommon`
-
-## Build
-
-```bash
-cargo build --release
-```
-
-To enable LLM support (for alternative phrasing):
-
-```bash
-cargo build --release --features llm
-```
+Playback supports Wayland (via `virtual-keyboard-unstable-v1`) and X11 (via the XTEST extension). It emits keyboard events only (no clipboard, no reading editor contents).
 
 ## Usage
 
-`drafter` types into **whatever is currently focused**. It does not read the editor contents.
+### Basic
+
+`drafter` types into whatever is currently focused. It does not read editor contents.
 
 General workflow:
 
-1. Open your target editor (e.g. Google Docs).
-2. Make sure the document is empty (or at least the cursor is where you want text inserted).
-3. Place the caret where typing should begin (click into the document).
-4. Run `drafter` with a short countdown.
-5. During the countdown, do not touch the keyboard/mouse; let it type.
-6. Press `Ctrl+C` to abort.
-
-By default, `play`/`run` print a live trace of typing/corrections to stderr (this includes draft text). Use `--no-trace` to disable.
-
-### One-shot: plan then play
+1. Open your target editor (and close/blur anything sensitive).
+2. Make sure the insertion point is where you want typing to begin.
+3. Run `drafter` with a short countdown. The simplest end-to-end command is `run` (plan then play):
 
 ```bash
-./target/release/drafter run --input draft.txt --countdown 5
+drafter run --input draft.txt --countdown 5
 ```
 
-### Two-step: plan and play separately
+4. Do not touch the keyboard/mouse during playback. If needed, press `Ctrl+C` to abort.
 
-Generate a plan JSON:
+You can also read the draft from stdin:
 
 ```bash
-./target/release/drafter plan --input draft.txt --output plan.json
+cat draft.txt | drafter run --input - --countdown 5
 ```
 
-Play it into the focused editor:
+If you want to keep the plan for later reuse, use two steps:
 
 ```bash
-./target/release/drafter play --plan plan.json --countdown 5
+drafter plan --input draft.txt --output plan.json
+drafter play --plan plan.json --countdown 5
 ```
 
-### Tuning
+### Advanced
 
-- `--wpm-min` / `--wpm-max`: speed range
-- `--error-rate`: probability of injecting an error per word (set to `0` for straight-through typing with no errors/corrections; incompatible with `--llm`)
-- `--immediate-fix-rate`: how often an error is fixed immediately
-- `--profile <chrome|compatible>`: word navigation behavior used during corrections (default `compatible`)
-- `--seed`: make planning deterministic (useful for debugging)
-- `--no-trace`: disable console typing/correction trace during playback (on by default)
-- `--seat <NAME>`: Wayland seat name to attach the virtual keyboard to (play/run only; e.g. `seat0`, `seat1`)
-
-### LLM phrasing
-
-When built with `--features llm`, `plan` and `run` can request paragraph-local phrase alternatives from OpenRouter, temporarily type them, and later edit them back so the final text matches the input exactly.
-
-- `--llm`: enable OpenRouter suggestions
-- `--llm-model <MODEL>`: model name (default `google/gemini-3-flash-preview`)
-- `--llm-max-suggestions <N>`: maximum suggestions per paragraph
-- `--llm-rewrite-strength <subtle|moderate|dramatic>`
-- `--llm-max-concurrency <1-10>`
-- `--llm-cache <PATH>`: read/write JSON cache (contains your draft text); if it exists, no network is used
-- `--llm-on-error <fallback|error>`: default `fallback`
-
-Fetching requires building with `--features llm`. Without it, `--llm-cache` must already exist.
-Requires `OPENROUTER_API_KEY` in the environment (loads `.env` if present).
-
-Example:
+Pick a playback backend (useful in Wayland sessions with Xwayland). `auto` prefers Wayland when both are available:
 
 ```bash
-./target/release/drafter run --input draft.txt --countdown 5 --llm --llm-cache llm.json --seed 123
+drafter run --input draft.txt --backend auto
+drafter run --input draft.txt --backend wayland
+drafter run --input draft.txt --backend x11
+```
+
+(`--backend` applies to `play` and `run`.)
+
+Tune typing behavior:
+
+- Speed: `--wpm-min` / `--wpm-max`
+- Error injection: `--error-rate` and `--immediate-fix-rate` (set `--error-rate 0` for straight-through typing with no revisions)
+- Cursor-word navigation: `--profile <chrome|compatible>`
+- Determinism for debugging: `--seed <N>`
+
+Control timing and outputs:
+
+- Countdown before playback: `--countdown <secs>`
+- Save the generated plan in `run`: `--output plan.json`
+
+Wayland seat selection (Wayland only):
+
+```bash
+drafter run --input draft.txt --seat seat0
+```
+
+By default, `play` and `run` print a live trace of typing and corrections to stderr (this includes draft text). Disable it with `--no-trace`:
+
+```bash
+drafter run --input draft.txt --no-trace
+```
+
+LLM phrasing: With the `llm` feature enabled, `plan` and `run` can request paragraph-local phrase alternatives from OpenRouter, temporarily type them, and later edit them back so the final text matches the input exactly.
+
+```bash
+drafter run --input draft.txt --llm
+```
+
+LLM notes:
+
+- Requires `OPENROUTER_API_KEY` in the environment (loads `.env` if present).
+- `--llm` is incompatible with `--error-rate 0`.
+
+## Development
+
+Default features enable both Wayland and X11 playback; LLM support is opt-in.
+
+You need a recent Rust toolchain (edition 2021) plus the system libraries listed below.
+
+Build:
+
+```bash
+cargo build
+```
+
+Feature selection examples:
+
+```bash
+# X11-only build
+cargo build --no-default-features --features x11
+
+# Wayland-only build
+cargo build --no-default-features --features wayland
+
+# Enable LLM support in addition to the default backends
+cargo build --features llm
+```
+
+System dependencies:
+
+- `libxkbcommon` is used for keymap generation (planner) and is required for all builds.
+- `libwayland-client` is required when building with the `wayland` feature (enabled by default).
+
+Runtime environments:
+
+- Wayland playback requires a compositor that exposes `zwp_virtual_keyboard_manager_v1` to clients (this project is primarily tested on Sway/wlroots).
+- X11 playback requires an X server with the XTEST extension and currently assumes the X server keymap is US-QWERTY (the backend will validate and suggest `setxkbmap us` if it does not match).
+
+Tests:
+
+```bash
+cargo test
 ```
 
 ## Text limitations
@@ -118,6 +137,12 @@ Example:
 - `zwp_virtual_keyboard_manager_v1 not available`:
   - Your compositor session isn’t exposing the protocol to clients.
   - You can check advertised globals with `wayland-info` (package `wayland-utils`).
+
+- `X11 backend requires the XTEST extension`:
+  - Your X server does not expose XTEST (or it’s blocked). Try a different Xorg/Xwayland setup.
+
+- `X11 backend currently requires a US keyboard layout`:
+  - Set your X keymap to US (example: `setxkbmap us`).
 
 - Output doesn’t match the draft:
   - The editor wasn’t empty when you started.
