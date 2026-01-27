@@ -57,7 +57,7 @@ fn backend_unavailable_message() -> String {
     }
 }
 
-fn require_supported_backend(selected: PlaybackBackend, resolved: PlaybackBackend) -> Result<()> {
+fn require_supported_backend(_selected: PlaybackBackend, resolved: PlaybackBackend) -> Result<()> {
     match resolved {
         PlaybackBackend::Wayland => {
             #[cfg(feature = "wayland")]
@@ -112,16 +112,6 @@ fn require_supported_backend(selected: PlaybackBackend, resolved: PlaybackBacken
             ))
         }
     }
-    .map_err(|err| {
-        // Improve the error slightly if the user explicitly requested a backend.
-        match selected {
-            PlaybackBackend::Wayland => {
-                anyhow!("Wayland backend selected but not available/unsupported. {err:#}")
-            }
-            PlaybackBackend::X11 => anyhow!("X11 backend selected but not available/unsupported. {err:#}"),
-            PlaybackBackend::Auto => err,
-        }
-    })
 }
 
 pub fn resolve_backend(requested: PlaybackBackend) -> Result<PlaybackBackend> {

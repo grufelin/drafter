@@ -123,44 +123,91 @@ fn validate_us_keymap(conn: &impl Connection) -> Result<()> {
         ),
     ];
 
-    let mut no_symbol_count = 0usize;
-    let mut first_no_symbol: Option<(u8, xproto::Keysym, xproto::Keysym)> = None;
-    let mut first_mismatch: Option<(u8, xproto::Keysym, xproto::Keysym)> = None;
+    #[derive(Debug, Clone, Copy)]
+    struct Example {
+        evdev_keycode: u32,
+        x11_keycode: u8,
+        expected0: xproto::Keysym,
+        expected1: xproto::Keysym,
+        got0: xproto::Keysym,
+        got1: xproto::Keysym,
+    }
 
-    for (evdev, unshifted, shifted) in checks {
+    let mut no_symbol_count = 0usize;
+    let mut first_no_symbol: Option<Example> = None;
+    let mut first_mismatch: Option<Example> = None;
+
+    for (evdev, expected0, expected1) in checks {
         let keycode = evdev_to_x11_keycode(*evdev)?;
         // We assume index 0 is unshifted, index 1 is shifted.
         let got0 = keysym_for_keycode(conn, keycode, 0)?;
         let got1 = keysym_for_keycode(conn, keycode, 1)?;
 
+        let example = Example {
+            evdev_keycode: *evdev,
+            x11_keycode: keycode,
+            expected0: *expected0,
+            expected1: *expected1,
+            got0,
+            got1,
+        };
+
         if got0 == x11rb::NO_SYMBOL || got1 == x11rb::NO_SYMBOL {
             no_symbol_count += 1;
             if first_no_symbol.is_none() {
-                first_no_symbol = Some((keycode, got0, got1));
+                first_no_symbol = Some(example);
             }
             continue;
         }
 
-        if (got0 != *unshifted || got1 != *shifted) && first_mismatch.is_none() {
-            first_mismatch = Some((keycode, got0, got1));
+        if (got0 != *expected0 || got1 != *expected1) && first_mismatch.is_none() {
+            first_mismatch = Some(example);
         }
     }
 
     if no_symbol_count > 0 {
-        let extra = if let Some((keycode, got0, got1)) = first_no_symbol {
-            format!(" (example keycode {keycode}: got {got0:#x}/{got1:#x})")
-        } else {
-            String::new()
-        };
+        let extra = first_no_symbol
+            .map(|ex| {
+                format!(
+                    " (example evdev {evdev} -> X11 keycode {keycode}: expected {expected0:#x}/{expected1:#x}, got {got0:#x}/{got1:#x})",
+                    evdev = ex.evdev_keycode,
+                    keycode = ex.x11_keycode,
+                    expected0 = ex.expected0,
+                    expected1 = ex.expected1,
+                    got0 = ex.got0,
+                    got1 = ex.got1,
+                )
+            })
+            .unwrap_or_default();
+
+        let mismatch_extra = first_mismatch
+            .map(|ex| {
+                format!(
+                    " Also observed a keysym mismatch (example evdev {evdev} -> X11 keycode {keycode}: expected {expected0:#x}/{expected1:#x}, got {got0:#x}/{got1:#x}).",
+                    evdev = ex.evdev_keycode,
+                    keycode = ex.x11_keycode,
+                    expected0 = ex.expected0,
+                    expected1 = ex.expected1,
+                    got0 = ex.got0,
+                    got1 = ex.got1,
+                )
+            })
+            .unwrap_or_default();
 
         return Err(anyhow!(
-            "X11 backend could not validate the X server keymap because some representative keys returned NoSymbol{extra}. This backend assumes X11 keycodes are evdev+8 and currently requires a US keymap; unusual server keycode mappings may not work."
+            "X11 backend could not validate the X server keymap because some representative keys returned NoSymbol{extra}. This backend assumes X11 keycodes are evdev+8 and currently requires a US keymap; unusual server keycode mappings may not work. Try `setxkbmap us`.{mismatch_extra}"
         ));
     }
 
-    if let Some((keycode, got0, got1)) = first_mismatch {
+    if let Some(ex) = first_mismatch {
         return Err(anyhow!(
-            "X11 backend currently requires a US keyboard layout, but the X server keymap does not match (keycode {keycode}: got {got0:#x}/{got1:#x}). Try `setxkbmap us`."
+            "X11 backend currently requires a US keyboard layout, but the X server keymap does not match (evdev {evdev} -> X11 keycode {keycode}: expected {expected0:#x}/{expected1:#x}, got {got0:#x}/{got1:#x}). Try `setxkbmap us`.",
+            evdev = ex.evdev_keycode,
+            keycode = ex.x11_keycode,
+            expected0 = ex.expected0,
+            expected1 = ex.expected1,
+            got0 = ex.got0,
+            got1 = ex.got1,
         ));
     }
 
