@@ -236,6 +236,24 @@ pub fn play_plan_wayland(
 
     let start = Instant::now();
 
+    let reset_modifiers_best_effort = |keyboard: &ZwpVirtualKeyboardV1| {
+        keyboard.modifiers(0, 0, 0, 0);
+
+        let t = start.elapsed().as_millis();
+        let time_ms: u32 = t.try_into().unwrap_or(u32::MAX);
+
+        // Best-effort releases. We may send releases even if not down; this is intended to
+        // reduce the chance of leaving stuck modifiers if playback is aborted mid-run.
+        for keycode in [
+            crate::keyboard::KEY_LEFTSHIFT,
+            crate::keyboard::KEY_RIGHTSHIFT,
+            crate::keyboard::KEY_LEFTCTRL,
+            crate::keyboard::KEY_RIGHTCTRL,
+        ] {
+            keyboard.key(time_ms, keycode, 0);
+        }
+    };
+
     for (action_index, action) in plan.actions.iter().enumerate() {
         if stop.load(Ordering::SeqCst) {
             break;
@@ -261,24 +279,36 @@ pub fn play_plan_wayland(
                 group,
             } => {
                 keyboard.modifiers(*mods_depressed, *mods_latched, *mods_locked, *group);
-                conn.flush().ok();
+                if let Err(e) = conn.flush().with_context(|| {
+                    format!("Wayland flush failed (action_index={action_index}, action=modifiers)")
+                }) {
+                    eprintln!("Playback error. Attempting to reset modifiers...");
+                    reset_modifiers_best_effort(&keyboard);
+                    let _ = conn.flush();
+                    return Err(e);
+                }
             }
             Action::Key { keycode, state } => {
                 let t = start.elapsed().as_millis();
                 let time_ms: u32 = t.try_into().unwrap_or(u32::MAX);
                 keyboard.key(time_ms, *keycode, key_state_to_u32(*state));
-                conn.flush().ok();
+                if let Err(e) = conn.flush().with_context(|| {
+                    format!(
+                        "Wayland flush failed (action_index={action_index}, action=key keycode={keycode} state={state:?})"
+                    )
+                }) {
+                    eprintln!("Playback error. Attempting to reset modifiers...");
+                    reset_modifiers_best_effort(&keyboard);
+                    let _ = conn.flush();
+                    return Err(e);
+                }
             }
         }
     }
 
     if stop.load(Ordering::SeqCst) {
         eprintln!("Aborted. Attempting to reset modifiers...");
-        keyboard.modifiers(0, 0, 0, 0);
-        let t = start.elapsed().as_millis();
-        let time_ms: u32 = t.try_into().unwrap_or(u32::MAX);
-        keyboard.key(time_ms, crate::keyboard::KEY_LEFTSHIFT, 0);
-        keyboard.key(time_ms, crate::keyboard::KEY_LEFTCTRL, 0);
+        reset_modifiers_best_effort(&keyboard);
         conn.flush().ok();
         return Err(anyhow!("aborted"));
     }
