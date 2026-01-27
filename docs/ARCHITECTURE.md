@@ -6,8 +6,8 @@
 
 1. **Plan**: turn a final draft text into a fully-expanded sequence of low-level keyboard actions (key presses/releases, modifier updates, and waits).
 2. **Play**: replay the precomputed action sequence into the currently focused surface using either:
-   - **Wayland**: a virtual keyboard (`virtual-keyboard-unstable-v1`) with an XKB keymap.
-   - **X11**: XTEST synthetic key events.
+   - **Wayland**: a virtual keyboard (`virtual-keyboard-unstable-v1`) with a per-client XKB keymap (so the plan's evdev keycodes are interpreted consistently).
+   - **X11**: XTEST synthetic key events (X11 cannot accept a per-client keymap, so the server keymap must match the plan's US assumptions).
 
 This separation is intentional:
 
@@ -171,7 +171,9 @@ Smart quotes support:
 
 `us_qwerty_keymap()` constructs an XKB keymap string (`KEYMAP_FORMAT_TEXT_V1`) for rules/model/layout `evdev/pc105/us` and also returns modifier bit masks.
 
-This keymap string is sent to the compositor via `zwp_virtual_keyboard_v1.keymap()`, enabling consistent interpretation of the evdev keycodes.
+This keymap string is sent to the compositor via `zwp_virtual_keyboard_v1.keymap()`, enabling consistent interpretation of the evdev keycodes on Wayland.
+
+On X11, there is no equivalent per-client keymap for XTEST-injected key events; the X11 backend instead validates that the *server* keymap looks like US-QWERTY before playback.
 
 ### Planner (`src/planner.rs`)
 
