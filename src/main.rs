@@ -522,8 +522,9 @@ fn main() -> Result<()> {
             seat,
             no_trace,
         } => {
-            // Fail fast on unsupported environments/backends.
-            drafter::playback::resolve_backend(backend.to_library())?;
+            // Fail fast on unsupported environments/backends and invalid playback flags.
+            let backend =
+                drafter::playback::preflight_backend(backend.to_library(), seat.as_deref())?;
 
             let json = fs::read_to_string(&plan)
                 .with_context(|| format!("failed to read {}", plan.display()))?;
@@ -538,13 +539,7 @@ fn main() -> Result<()> {
                 (stats.total_wait_ms as f64) / 1000.0 / 60.0
             );
 
-            play_plan(
-                &plan,
-                countdown,
-                !no_trace,
-                seat.as_deref(),
-                backend.to_library(),
-            )?;
+            play_plan(&plan, countdown, !no_trace, seat.as_deref(), backend)?;
         }
         Command::Run {
             input,
@@ -561,8 +556,9 @@ fn main() -> Result<()> {
             profile,
             llm,
         } => {
-            // Fail fast on unsupported environments/backends.
-            drafter::playback::resolve_backend(backend.to_library())?;
+            // Fail fast on unsupported environments/backends and invalid playback flags.
+            let backend =
+                drafter::playback::preflight_backend(backend.to_library(), seat.as_deref())?;
 
             let final_text = read_input(&input)?;
             let cfg = build_config(wpm_min, wpm_max, error_rate, immediate_fix_rate, profile);
@@ -585,13 +581,7 @@ fn main() -> Result<()> {
                 write_output(&out, &json)?;
             }
 
-            play_plan(
-                &plan,
-                countdown,
-                !no_trace,
-                seat.as_deref(),
-                backend.to_library(),
-            )?;
+            play_plan(&plan, countdown, !no_trace, seat.as_deref(), backend)?;
         }
     }
 

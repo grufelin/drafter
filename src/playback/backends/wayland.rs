@@ -122,20 +122,6 @@ pub fn play_plan_wayland(
         .context("failed to install Ctrl+C handler")?;
     }
 
-    if countdown_secs > 0 {
-        eprintln!("Focus the target editor window. Starting in {countdown_secs}s...");
-        for remaining in (1..=countdown_secs).rev() {
-            if stop.load(Ordering::SeqCst) {
-                return Err(anyhow!("aborted"));
-            }
-            eprintln!("{remaining}...");
-            sleep_interruptible(stop.as_ref(), 1000);
-        }
-        if stop.load(Ordering::SeqCst) {
-            return Err(anyhow!("aborted"));
-        }
-    }
-
     let conn = Connection::connect_to_env().context("failed to connect to Wayland")?;
     let (globals, mut event_queue) =
         registry_queue_init(&conn).context("failed to init Wayland registry")?;
@@ -230,6 +216,20 @@ pub fn play_plan_wayland(
     keyboard.keymap(plan.config.keymap_format, keymap_fd.as_fd(), keymap_size);
 
     conn.flush().context("Wayland flush failed")?;
+
+    if countdown_secs > 0 {
+        eprintln!("Focus the target editor window. Starting in {countdown_secs}s...");
+        for remaining in (1..=countdown_secs).rev() {
+            if stop.load(Ordering::SeqCst) {
+                return Err(anyhow!("aborted"));
+            }
+            eprintln!("{remaining}...");
+            sleep_interruptible(stop.as_ref(), 1000);
+        }
+        if stop.load(Ordering::SeqCst) {
+            return Err(anyhow!("aborted"));
+        }
+    }
 
     let trace_events = trace.then(|| plan_console_trace(&plan.actions));
     let mut next_trace_event = 0usize;
