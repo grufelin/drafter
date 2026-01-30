@@ -244,12 +244,7 @@ pub fn play_plan_wayland(
 
         // Best-effort releases. We may send releases even if not down; this is intended to
         // reduce the chance of leaving stuck modifiers if playback is aborted mid-run.
-        for keycode in [
-            crate::keyboard::KEY_LEFTSHIFT,
-            crate::keyboard::KEY_RIGHTSHIFT,
-            crate::keyboard::KEY_LEFTCTRL,
-            crate::keyboard::KEY_RIGHTCTRL,
-        ] {
+        for keycode in super::COMMON_MODIFIER_KEYCODES {
             keyboard.key(time_ms, keycode, 0);
         }
     };

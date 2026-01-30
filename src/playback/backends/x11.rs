@@ -235,13 +235,7 @@ fn xtest_key(
 fn reset_common_modifiers_best_effort(conn: &impl Connection, root: xproto::Window) {
     // Best-effort release. We may send releases even if not down; this is intended to
     // avoid leaving a stuck modifier (or starting with one) when a previous run was aborted.
-    for keycode in [
-        crate::keyboard::KEY_LEFTSHIFT,
-        crate::keyboard::KEY_RIGHTSHIFT,
-        crate::keyboard::KEY_LEFTCTRL,
-        crate::keyboard::KEY_RIGHTCTRL,
-        crate::keyboard::KEY_LEFTALT,
-    ] {
+    for keycode in super::COMMON_MODIFIER_KEYCODES {
         if let Ok(code) = evdev_to_x11_keycode(keycode) {
             let _ = xtest_key(conn, root, code, KeyState::Released);
         }
