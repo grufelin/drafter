@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 
 use crate::keyboard::{
     keystroke_for_output_char, KEY_BACKSPACE, KEY_DELETE, KEY_LEFT, KEY_LEFTCTRL, KEY_LEFTSHIFT,
-    KEY_RIGHT, KEY_RIGHTSHIFT,
+    KEY_RIGHT, KEY_RIGHTCTRL, KEY_RIGHTSHIFT,
 };
 use crate::model::{Action, KeyState, Plan};
 
@@ -135,11 +135,11 @@ pub fn simulate_typed_text(plan: &Plan) -> Result<String> {
                 shift_down = false;
                 continue;
             }
-            (KEY_LEFTCTRL, KeyState::Pressed) => {
+            (KEY_LEFTCTRL | KEY_RIGHTCTRL, KeyState::Pressed) => {
                 ctrl_down = true;
                 continue;
             }
-            (KEY_LEFTCTRL, KeyState::Released) => {
+            (KEY_LEFTCTRL | KEY_RIGHTCTRL, KeyState::Released) => {
                 ctrl_down = false;
                 continue;
             }
