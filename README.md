@@ -65,6 +65,8 @@ Wayland seat selection (Wayland only):
 drafter run --input draft.txt --seat seat0
 ```
 
+If the requested seat is missing (or `--seat` is used with `--backend x11`), `drafter` errors before the countdown.
+
 By default, `play` and `run` print a live trace of typing and corrections to stderr (this includes draft text). Disable it with `--no-trace`:
 
 ```bash
