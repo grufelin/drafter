@@ -155,3 +155,4 @@ This tool generates real keyboard events. Use it carefully:
 
 - Close other windows and focus the correct editor.
 - Don’t run it on a system where unintended keystrokes could be destructive.
+- If you abort mid-run, `drafter` attempts to release common modifiers (Shift/Ctrl/Alt, including AltGr/Right Alt). If a modifier still feels “stuck”, press and release that modifier key once (especially if you were holding keys during abort).
