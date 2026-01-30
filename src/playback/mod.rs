@@ -19,12 +19,25 @@ fn env_is_set(name: &str) -> bool {
 }
 
 fn auto_backend() -> PlaybackBackend {
+    let wayland_env = env_is_set("WAYLAND_DISPLAY") || env_is_set("WAYLAND_SOCKET");
+    let x11_env = env_is_set("DISPLAY");
+
     // Prefer Wayland if both are present (common in Wayland sessions with Xwayland).
-    if cfg!(feature = "wayland") && (env_is_set("WAYLAND_DISPLAY") || env_is_set("WAYLAND_SOCKET"))
-    {
+    if wayland_env {
+        if cfg!(feature = "wayland") {
+            return PlaybackBackend::Wayland;
+        }
+
+        // If Wayland is detected but not supported in this build, fall back to X11 if available.
+        // Otherwise return Wayland so the caller can surface a helpful "detected but disabled"
+        // error.
+        if cfg!(feature = "x11") && x11_env {
+            return PlaybackBackend::X11;
+        }
         return PlaybackBackend::Wayland;
     }
-    if cfg!(feature = "x11") && env_is_set("DISPLAY") {
+
+    if x11_env {
         return PlaybackBackend::X11;
     }
 
@@ -57,7 +70,10 @@ fn backend_unavailable_message() -> String {
     }
 }
 
-fn require_supported_backend(_selected: PlaybackBackend, resolved: PlaybackBackend) -> Result<()> {
+fn require_supported_backend(
+    #[allow(unused_variables)] selected: PlaybackBackend,
+    resolved: PlaybackBackend,
+) -> Result<()> {
     match resolved {
         PlaybackBackend::Wayland => {
             #[cfg(feature = "wayland")]
@@ -67,8 +83,13 @@ fn require_supported_backend(_selected: PlaybackBackend, resolved: PlaybackBacke
 
             #[cfg(not(feature = "wayland"))]
             {
+                let how = match selected {
+                    PlaybackBackend::Auto => "detected",
+                    _ => "requested",
+                };
                 Err(anyhow!(
-                    "Wayland backend selected/detected but is disabled in this build. (Rebuild with `--features wayland`.) {details}",
+                    "Wayland backend {how} but is disabled in this build. (Rebuild with `--features wayland`.) {details}",
+                    how = how,
                     details = backend_unavailable_message()
                 ))
             }
@@ -81,8 +102,13 @@ fn require_supported_backend(_selected: PlaybackBackend, resolved: PlaybackBacke
 
             #[cfg(not(feature = "x11"))]
             {
+                let how = match selected {
+                    PlaybackBackend::Auto => "detected",
+                    _ => "requested",
+                };
                 Err(anyhow!(
-                    "X11 backend selected/detected but is disabled in this build. (Rebuild with `--features x11`.) {details}",
+                    "X11 backend {how} but is disabled in this build. (Rebuild with `--features x11`.) {details}",
+                    how = how,
                     details = backend_unavailable_message()
                 ))
             }
@@ -104,7 +130,7 @@ fn require_supported_backend(_selected: PlaybackBackend, resolved: PlaybackBacke
             };
 
             Err(anyhow!(
-                "No supported playback backend detected. {details} \n\
+                "No supported playback backend detected. {details}\n\
                  {hint} {}",
                 forced.join(" or "),
                 details = backend_unavailable_message(),

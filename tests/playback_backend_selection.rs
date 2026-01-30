@@ -79,7 +79,10 @@ fn auto_prefers_wayland_when_both_present() {
     {
         let err = resolve_backend(PlaybackBackend::Auto).unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("No supported playback backend"));
+        assert!(
+            msg.contains("Wayland backend detected") && msg.contains("disabled"),
+            "expected a Wayland-detected disabled-backend message, got: {msg}"
+        );
     }
 }
 
@@ -103,8 +106,8 @@ fn auto_errors_or_resolves_on_x11_only() {
         let err = resolve_backend(PlaybackBackend::Auto).unwrap_err();
         let msg = format!("{err:#}");
         assert!(
-            msg.contains("No supported playback backend detected"),
-            "expected missing-backend wording, got: {msg}"
+            msg.contains("X11 backend detected") && msg.contains("disabled"),
+            "expected a detected-but-disabled X11 message, got: {msg}"
         );
         assert!(
             msg.contains("DISPLAY is set"),
@@ -132,7 +135,31 @@ fn explicit_x11_is_rejected_or_accepted() {
     {
         let err = resolve_backend(PlaybackBackend::X11).unwrap_err();
         let msg = format!("{err:#}");
-        assert!(msg.contains("X11"));
-        assert!(msg.contains("disabled"));
+        assert!(msg.contains("X11 backend requested"), "got: {msg}");
+        assert!(msg.contains("disabled"), "got: {msg}");
+    }
+}
+
+#[test]
+fn explicit_wayland_is_rejected_or_accepted() {
+    let _guard = env_lock().lock().unwrap();
+    let _restore = EnvRestore::snapshot();
+
+    unset("WAYLAND_DISPLAY");
+    unset("WAYLAND_SOCKET");
+    unset("DISPLAY");
+
+    #[cfg(feature = "wayland")]
+    {
+        let resolved = resolve_backend(PlaybackBackend::Wayland).expect("should resolve");
+        assert_eq!(resolved, PlaybackBackend::Wayland);
+    }
+
+    #[cfg(not(feature = "wayland"))]
+    {
+        let err = resolve_backend(PlaybackBackend::Wayland).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(msg.contains("Wayland backend requested"), "got: {msg}");
+        assert!(msg.contains("disabled"), "got: {msg}");
     }
 }
