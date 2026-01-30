@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::sync::{Mutex, OnceLock};
 
-use drafter::playback::{resolve_backend, PlaybackBackend};
+use drafter::playback::{preflight_backend, resolve_backend, PlaybackBackend};
 
 fn env_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -161,5 +161,42 @@ fn explicit_wayland_is_rejected_or_accepted() {
         let msg = format!("{err:#}");
         assert!(msg.contains("Wayland backend requested"), "got: {msg}");
         assert!(msg.contains("disabled"), "got: {msg}");
+    }
+}
+
+#[test]
+fn seat_must_not_be_empty() {
+    let err = preflight_backend(PlaybackBackend::Wayland, Some("   ")).unwrap_err();
+    let msg = format!("{err:#}");
+    assert!(msg.contains("--seat must not be empty"), "got: {msg}");
+}
+
+#[test]
+fn seat_is_rejected_on_x11() {
+    let _guard = env_lock().lock().unwrap();
+    let _restore = EnvRestore::snapshot();
+
+    unset("WAYLAND_DISPLAY");
+    unset("WAYLAND_SOCKET");
+    set("DISPLAY", ":0");
+
+    #[cfg(feature = "x11")]
+    {
+        let err = preflight_backend(PlaybackBackend::Auto, Some("seat0")).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("--seat is Wayland-only") && msg.contains("X11"),
+            "expected a seat-on-X11 error, got: {msg}"
+        );
+    }
+
+    #[cfg(not(feature = "x11"))]
+    {
+        let err = preflight_backend(PlaybackBackend::Auto, Some("seat0")).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("X11 backend detected") && msg.contains("disabled"),
+            "expected a detected-but-disabled X11 message, got: {msg}"
+        );
     }
 }

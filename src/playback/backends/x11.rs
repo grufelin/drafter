@@ -253,6 +253,16 @@ pub fn play_plan_x11(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()
         .context("failed to install Ctrl+C handler")?;
     }
 
+    let (conn, screen_num) = x11rb::connect(None).context("failed to connect to X11")?;
+    query_xtest(&conn)?;
+    validate_us_keymap(&conn)?;
+
+    let setup = conn.setup();
+    let screen = setup
+        .roots
+        .get(screen_num)
+        .ok_or_else(|| anyhow!("invalid X11 screen index"))?;
+
     if countdown_secs > 0 {
         eprintln!("Focus the target editor window. Starting in {countdown_secs}s...");
         for remaining in (1..=countdown_secs).rev() {
@@ -266,16 +276,6 @@ pub fn play_plan_x11(plan: &Plan, countdown_secs: u64, trace: bool) -> Result<()
             return Err(anyhow!("aborted"));
         }
     }
-
-    let (conn, screen_num) = x11rb::connect(None).context("failed to connect to X11")?;
-    query_xtest(&conn)?;
-    validate_us_keymap(&conn)?;
-
-    let setup = conn.setup();
-    let screen = setup
-        .roots
-        .get(screen_num)
-        .ok_or_else(|| anyhow!("invalid X11 screen index"))?;
 
     // Sanity check: require explicit input focus.
     let focus = get_focus(&conn)?;

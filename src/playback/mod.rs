@@ -150,6 +150,27 @@ pub fn resolve_backend(requested: PlaybackBackend) -> Result<PlaybackBackend> {
     Ok(resolved)
 }
 
+pub fn preflight_backend(
+    requested: PlaybackBackend,
+    seat_name: Option<&str>,
+) -> Result<PlaybackBackend> {
+    if let Some(name) = seat_name {
+        if name.trim().is_empty() {
+            return Err(anyhow!("--seat must not be empty"));
+        }
+    }
+
+    let resolved = resolve_backend(requested)?;
+
+    if seat_name.is_some() && resolved == PlaybackBackend::X11 {
+        return Err(anyhow!(
+            "--seat is Wayland-only and is not supported on X11"
+        ));
+    }
+
+    Ok(resolved)
+}
+
 pub fn play_plan(
     plan: &Plan,
     countdown_secs: u64,
@@ -160,7 +181,7 @@ pub fn play_plan(
     #[cfg(all(not(feature = "wayland"), not(feature = "x11")))]
     let _ = (plan, countdown_secs, trace, seat_name);
 
-    let backend = resolve_backend(backend)?;
+    let backend = preflight_backend(backend, seat_name)?;
 
     match backend {
         PlaybackBackend::Wayland => {
@@ -178,12 +199,6 @@ pub fn play_plan(
             }
         }
         PlaybackBackend::X11 => {
-            if seat_name.is_some() {
-                return Err(anyhow!(
-                    "--seat is Wayland-only and is not supported on X11"
-                ));
-            }
-
             #[cfg(feature = "x11")]
             {
                 backends::x11::play_plan_x11(plan, countdown_secs, trace)

@@ -35,3 +35,4 @@ Done means:
 ## Notes / pitfalls
 
 - Keyboard focus is per-seat; the target editor must be focused for that seat before the countdown ends.
+- Seat discovery happens before the countdown; missing seat errors surface immediately.

@@ -283,6 +283,8 @@ Playback can bind the virtual keyboard to a specific `wl_seat` by **seat name**:
 - CLI: `--seat <NAME>` on `play` and `run` (example: `seat0`, `seat1`).
 - Implementation: playback enumerates `wl_seat` globals, collects `wl_seat.name`, selects the requested seat, then creates the virtual keyboard bound to that seat.
 
+Seat discovery happens before the countdown so invalid seat names fail fast (the countdown is only for giving you time to focus the target editor).
+
 Important: focus is per-seat; the target editor must be focused for the chosen seat.
 
 ## Testing
