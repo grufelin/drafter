@@ -1,5 +1,5 @@
 use drafter::keyboard::{
-    keystroke_for_output_char, KEY_BACKSPACE, KEY_LEFT, KEY_LEFTCTRL, KEY_RIGHT,
+    keystroke_for_output_char, KEY_BACKSPACE, KEY_LEFT, KEY_LEFTCTRL, KEY_RIGHT, KEY_RIGHTCTRL,
 };
 use drafter::model::{Action, KeyState, Plan, PlanConfig};
 use drafter::sim::simulate_typed_text;
@@ -74,6 +74,64 @@ fn simulate_supports_ctrl_right_word_nav() {
     });
     actions.push(Action::Key {
         keycode: KEY_LEFTCTRL,
+        state: KeyState::Released,
+    });
+
+    actions.push(Action::Key {
+        keycode: KEY_BACKSPACE,
+        state: KeyState::Pressed,
+    });
+
+    let plan = dummy_plan(actions);
+    let out = simulate_typed_text(&plan).expect("plan simulation should succeed");
+    assert_eq!(out, "hello worl");
+}
+
+#[test]
+fn simulate_supports_rightctrl_left_word_nav() {
+    let mut actions = key_presses_for_text("hello world");
+
+    actions.push(Action::Key {
+        keycode: KEY_RIGHTCTRL,
+        state: KeyState::Pressed,
+    });
+    actions.push(Action::Key {
+        keycode: KEY_LEFT,
+        state: KeyState::Pressed,
+    });
+    actions.push(Action::Key {
+        keycode: KEY_RIGHTCTRL,
+        state: KeyState::Released,
+    });
+
+    actions.push(Action::Key {
+        keycode: KEY_BACKSPACE,
+        state: KeyState::Pressed,
+    });
+
+    let plan = dummy_plan(actions);
+    let out = simulate_typed_text(&plan).expect("plan simulation should succeed");
+    assert_eq!(out, "helloworld");
+}
+
+#[test]
+fn simulate_supports_rightctrl_right_word_nav() {
+    let mut actions = key_presses_for_text("hello world");
+
+    actions.push(Action::Key {
+        keycode: KEY_RIGHTCTRL,
+        state: KeyState::Pressed,
+    });
+    actions.push(Action::Key {
+        keycode: KEY_LEFT,
+        state: KeyState::Pressed,
+    });
+    actions.push(Action::Key {
+        keycode: KEY_RIGHT,
+        state: KeyState::Pressed,
+    });
+    actions.push(Action::Key {
+        keycode: KEY_RIGHTCTRL,
         state: KeyState::Released,
     });
 
